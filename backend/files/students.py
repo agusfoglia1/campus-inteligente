@@ -1,0 +1,178 @@
+import datetime as dt
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.api.v1.auth import get_current_user
+from app.db.session import get_db
+from app.models.academic import Building, Classroom, Commission, ScheduleSlot, Subject
+from app.models.attendance import Attendance, AttendanceStatus
+from app.models.enrollment import Enrollment, EnrollmentStatus
+from app.models.profiles import StudentProfile
+from app.models.user import User, UserRole
+from app.schemas.dashboard import (
+    AttendanceHistoryItemOut,
+    ClassInfoOut,
+    NextClassOut,
+    StudentDashboardOut,
+)
+from app.services.schedule import next_occurrence, today_as_dayofweek
+
+router = APIRouter(prefix="/students", tags=["students"])
+
+
+def get_current_student_profile(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> StudentProfile:
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Esta información es solo para estudiantes")
+
+    profile = db.query(StudentProfile).filter(StudentProfile.user_id == current_user.id).first()
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Tu usuario todavía no tiene un perfil de estudiante asociado (legajo, carrera, etc.)",
+        )
+    return profile
+
+
+def _get_active_schedule_slots(profile: StudentProfile, db: Session):
+    """Trae todos los bloques horarios de las comisiones en las que el
+    estudiante está cursando actualmente, con toda la info relacionada."""
+    return (
+        db.query(ScheduleSlot, Commission, Subject, Classroom, Building)
+        .join(Commission, ScheduleSlot.commission_id == Commission.id)
+        .join(Subject, Commission.subject_id == Subject.id)
+        .join(Classroom, ScheduleSlot.classroom_id == Classroom.id)
+        .join(Building, Classroom.building_id == Building.id)
+        .join(Enrollment, Enrollment.commission_id == Commission.id)
+        .filter(Enrollment.student_profile_id == profile.id)
+        .filter(Enrollment.estado == EnrollmentStatus.CURSANDO)
+        .all()
+    )
+
+
+def _build_class_info(slot, commission, subject, classroom, building) -> ClassInfoOut:
+    docente_nombre = None
+    if commission.teacher_profile and commission.teacher_profile.user:
+        docente_nombre = commission.teacher_profile.user.full_name
+
+    return ClassInfoOut(
+        commission_id=commission.id,
+        materia=subject.nombre,
+        materia_codigo=subject.codigo,
+        docente=docente_nombre,
+        aula=classroom.codigo,
+        edificio=building.nombre,
+        dia=slot.dia.value,
+        hora_inicio=slot.hora_inicio,
+        hora_fin=slot.hora_fin,
+    )
+
+
+@router.get("/me/dashboard", response_model=StudentDashboardOut)
+def get_dashboard(
+    profile: StudentProfile = Depends(get_current_student_profile),
+    db: Session = Depends(get_db),
+):
+    now = dt.datetime.now()
+    rows = _get_active_schedule_slots(profile, db)
+
+    # Materias del día
+    today = today_as_dayofweek(now)
+    materias_del_dia = [
+        _build_class_info(*row) for row in rows if today is not None and row[0].dia == today
+    ]
+    materias_del_dia.sort(key=lambda c: c.hora_inicio)
+
+    # Próxima clase (la ocurrencia más cercana entre todos los horarios)
+    proxima_clase = None
+    best_dt, best_row = None, None
+    for row in rows:
+        slot = row[0]
+        occurrence = next_occurrence(slot.dia, slot.hora_inicio, now)
+        if best_dt is None or occurrence < best_dt:
+            best_dt, best_row = occurrence, row
+
+    if best_row is not None:
+        info = _build_class_info(*best_row)
+        proxima_clase = NextClassOut(**info.model_dump(), fecha=best_dt.date())
+
+    # Historial reciente (últimos 10 registros de asistencia)
+    historial_rows = (
+        db.query(Attendance, Subject, Classroom)
+        .join(Commission, Attendance.commission_id == Commission.id)
+        .join(Subject, Commission.subject_id == Subject.id)
+        .join(Classroom, Attendance.classroom_id == Classroom.id)
+        .filter(Attendance.student_profile_id == profile.id)
+        .order_by(Attendance.fecha.desc(), Attendance.hora.desc())
+        .limit(10)
+        .all()
+    )
+    historial_reciente = [
+        AttendanceHistoryItemOut(
+            fecha=a.fecha, hora=a.hora, materia=sub.nombre, aula=cl.codigo, estado=a.estado.value
+        )
+        for (a, sub, cl) in historial_rows
+    ]
+
+    # Porcentaje de asistencia (sobre el total de registros que existan hasta ahora)
+    total = db.query(Attendance).filter(Attendance.student_profile_id == profile.id).count()
+    porcentaje_asistencia = None
+    if total > 0:
+        presentes = (
+            db.query(Attendance)
+            .filter(
+                Attendance.student_profile_id == profile.id,
+                Attendance.estado.in_([AttendanceStatus.PRESENTE, AttendanceStatus.TARDE]),
+            )
+            .count()
+        )
+        porcentaje_asistencia = round((presentes / total) * 100, 1)
+
+    return StudentDashboardOut(
+        nombre=profile.user.full_name,
+        legajo=profile.legajo,
+        proxima_clase=proxima_clase,
+        materias_del_dia=materias_del_dia,
+        porcentaje_asistencia=porcentaje_asistencia,
+        historial_reciente=historial_reciente,
+    )
+
+
+@router.get("/me/materias", response_model=list[ClassInfoOut])
+def get_my_subjects(
+    profile: StudentProfile = Depends(get_current_student_profile),
+    db: Session = Depends(get_db),
+):
+    """Todas las materias/comisiones en las que el estudiante está cursando,
+    con su horario. Sirve para la pantalla 'Ver mis próximas clases'."""
+    rows = _get_active_schedule_slots(profile, db)
+    classes = [_build_class_info(*row) for row in rows]
+    classes.sort(key=lambda c: (c.dia, c.hora_inicio))
+    return classes
+
+
+@router.get("/me/asistencias", response_model=list[AttendanceHistoryItemOut])
+def get_my_attendance_history(
+    profile: StudentProfile = Depends(get_current_student_profile),
+    db: Session = Depends(get_db),
+    limit: int = 50,
+):
+    """Historial completo de asistencias (paginado con 'limit')."""
+    rows = (
+        db.query(Attendance, Subject, Classroom)
+        .join(Commission, Attendance.commission_id == Commission.id)
+        .join(Subject, Commission.subject_id == Subject.id)
+        .join(Classroom, Attendance.classroom_id == Classroom.id)
+        .filter(Attendance.student_profile_id == profile.id)
+        .order_by(Attendance.fecha.desc(), Attendance.hora.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        AttendanceHistoryItemOut(
+            fecha=a.fecha, hora=a.hora, materia=sub.nombre, aula=cl.codigo, estado=a.estado.value
+        )
+        for (a, sub, cl) in rows
+    ]

@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campus_user
+      POSTGRES_PASSWORD: campus_pass
+      POSTGRES_DB: campus_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - campus_db_data:/var/lib/postgresql/data
+
+volumes:
+  campus_db_data:
