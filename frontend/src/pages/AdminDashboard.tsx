@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
+import Badge, { toneForEstado } from '../components/Badge'
 
 // ---------- Tipos ----------
 interface Stats {
@@ -70,27 +71,18 @@ const TABS: [Tab, string][] = [
   ['actividad', 'Actividad'],
 ]
 
-const RESULT_COLORS: Record<string, string> = {
-  ok: 'bg-green-100 text-green-700',
-  wrong_classroom: 'bg-orange-100 text-orange-700',
-  no_class_now: 'bg-slate-100 text-slate-600',
-  invalid_token: 'bg-red-100 text-red-700',
-  replay: 'bg-red-100 text-red-700',
-  unknown_student: 'bg-red-100 text-red-700',
-}
-
 export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>('resumen')
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-1 bg-white rounded-xl shadow p-1 overflow-x-auto">
+      <div className="flex gap-1 bg-white rounded-xl border border-ink/10 p-1 overflow-x-auto">
         {TABS.map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-              tab === key ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+            className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              tab === key ? 'bg-ink text-paper' : 'text-ink/60 hover:bg-paper'
             }`}
           >
             {label}
@@ -146,9 +138,9 @@ function ResumenTab() {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {cards.map(([label, value]) => (
-        <div key={label} className="bg-white rounded-xl shadow p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">{value}</p>
-          <p className="text-slate-500 text-xs mt-1">{label}</p>
+        <div key={label} className="bg-ink text-paper rounded-xl p-4 text-center">
+          <p className="font-display text-3xl">{value}</p>
+          <p className="text-paper/50 text-xs mt-1">{label}</p>
         </div>
       ))}
     </div>
@@ -220,17 +212,20 @@ function EstudiantesTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap justify-between items-center gap-2">
-        <h2 className="text-lg font-semibold text-slate-800">Estudiantes</h2>
+        <h2 className="font-display text-xl text-ink">Estudiantes</h2>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700"
+          className="text-sm bg-cobalt text-white px-3 py-1.5 rounded-lg hover:bg-ink transition-colors"
         >
-          {showForm ? 'Cancelar' : '+ Nuevo estudiante'}
+          {showForm ? 'Cancelar' : 'Nuevo estudiante'}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-4 flex flex-col gap-3">
+        <form
+          onSubmit={handleSubmit}
+          className="border-l-4 border-cobalt bg-white rounded-r-xl p-5 flex flex-col gap-3"
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               type="email"
@@ -238,7 +233,7 @@ function EstudiantesTab() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm sm:col-span-2"
+              className="border border-ink/15 rounded-lg px-3 py-2 text-sm sm:col-span-2 focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
             <input
               type="password"
@@ -246,7 +241,7 @@ function EstudiantesTab() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-ink/15 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
             <input
               type="text"
@@ -254,7 +249,7 @@ function EstudiantesTab() {
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-ink/15 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
             <input
               type="text"
@@ -262,13 +257,13 @@ function EstudiantesTab() {
               required
               value={legajo}
               onChange={(e) => setLegajo(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-ink/15 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
             <select
               required
               value={careerId}
               onChange={(e) => setCareerId(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="border border-ink/15 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cobalt"
             >
               <option value="">Carrera...</option>
               {careers.map((c) => (
@@ -282,14 +277,14 @@ function EstudiantesTab() {
               placeholder="Año de ingreso (opcional)"
               value={anioIngreso}
               onChange={(e) => setAnioIngreso(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm sm:col-span-2"
+              className="border border-ink/15 rounded-lg px-3 py-2 text-sm sm:col-span-2 focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
           </div>
-          {formError && <p className="text-red-600 text-sm">{formError}</p>}
+          {formError && <p className="text-brick text-sm">{formError}</p>}
           <button
             type="submit"
             disabled={submitting}
-            className="bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="bg-cobalt text-white rounded-lg py-2 text-sm font-medium hover:bg-ink transition-colors disabled:opacity-50"
           >
             {submitting ? 'Creando...' : 'Crear estudiante'}
           </button>
@@ -300,26 +295,22 @@ function EstudiantesTab() {
       {error && <ErrorMessage message={error} onRetry={loadStudents} />}
 
       {!loading && !error && (
-        <div className="bg-white rounded-xl shadow p-4">
+        <div className="bg-white rounded-xl border border-ink/10 p-5">
           {students.length === 0 ? (
-            <p className="text-slate-500 text-sm">No hay estudiantes cargados.</p>
+            <p className="text-ink/40 text-sm">No hay estudiantes cargados.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-slate-100">
+            <ul className="flex flex-col divide-y divide-ink/5">
               {students.map((s) => (
-                <li key={s.student_profile_id} className="py-2 flex justify-between items-center text-sm gap-2">
+                <li key={s.student_profile_id} className="py-2.5 flex justify-between items-center text-sm gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-slate-700 truncate">{s.full_name}</p>
-                    <p className="text-slate-500 truncate">
+                    <p className="font-medium text-ink truncate">{s.full_name}</p>
+                    <p className="text-ink/50 truncate">
                       {s.legajo} · {s.email}
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 text-xs px-2 py-1 rounded-full ${
-                      s.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
+                  <Badge tone={s.is_active ? 'signal' : 'neutral'}>
                     {s.is_active ? 'Activo' : 'Inactivo'}
-                  </span>
+                  </Badge>
                 </li>
               ))}
             </ul>
@@ -359,22 +350,19 @@ function DispositivosTab() {
   if (error) return <ErrorMessage message={error} onRetry={loadDevices} />
 
   return (
-    <div className="bg-white rounded-xl shadow p-4">
-      <h2 className="text-lg font-semibold text-slate-800 mb-3">Dispositivos</h2>
+    <div className="bg-white rounded-xl border border-ink/10 p-5">
+      <h2 className="font-display text-xl text-ink mb-3">Dispositivos</h2>
       {devices.length === 0 ? (
-        <p className="text-slate-500 text-sm">No hay dispositivos registrados.</p>
+        <p className="text-ink/40 text-sm">No hay dispositivos registrados.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-100">
+        <ul className="flex flex-col divide-y divide-ink/5">
           {devices.map((d) => (
-            <li key={d.id} className="py-2 flex flex-wrap justify-between items-center gap-2 text-sm">
-              <p className="font-medium text-slate-700">{d.nombre}</p>
-              <button
-                onClick={() => toggleActive(d)}
-                className={`text-xs px-2 py-1 rounded-full ${
-                  d.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                {d.is_active ? 'Activo (click para desactivar)' : 'Inactivo (click para activar)'}
+            <li key={d.id} className="py-2.5 flex flex-wrap justify-between items-center gap-2 text-sm">
+              <p className="font-medium text-ink">{d.nombre}</p>
+              <button onClick={() => toggleActive(d)}>
+                <Badge tone={d.is_active ? 'signal' : 'neutral'}>
+                  {d.is_active ? 'Activo · desactivar' : 'Inactivo · activar'}
+                </Badge>
               </button>
             </li>
           ))}
@@ -408,33 +396,23 @@ function AsistenciasTab() {
   if (error) return <ErrorMessage message={error} onRetry={load} />
 
   return (
-    <div className="bg-white rounded-xl shadow p-4">
-      <h2 className="text-lg font-semibold text-slate-800 mb-3">Asistencias (todo el sistema)</h2>
+    <div className="bg-white rounded-xl border border-ink/10 p-5">
+      <h2 className="font-display text-xl text-ink mb-3">Asistencias (todo el sistema)</h2>
       {rows.length === 0 ? (
-        <p className="text-slate-500 text-sm">Todavía no hay asistencias registradas.</p>
+        <p className="text-ink/40 text-sm">Todavía no hay asistencias registradas.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-100">
+        <ul className="flex flex-col divide-y divide-ink/5">
           {rows.map((r, i) => (
-            <li key={i} className="py-2 flex justify-between items-center text-sm gap-2">
+            <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
               <div className="min-w-0">
-                <p className="font-medium text-slate-700 truncate">
-                  {r.estudiante} <span className="text-slate-400">({r.legajo})</span>
+                <p className="font-medium text-ink truncate">
+                  {r.estudiante} <span className="text-ink/40">({r.legajo})</span>
                 </p>
-                <p className="text-slate-500 truncate">
+                <p className="text-ink/50 truncate">
                   {r.materia} · {r.comision} · {r.aula} · {r.fecha} {r.hora.slice(0, 5)}
                 </p>
               </div>
-              <span
-                className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                  r.estado === 'presente'
-                    ? 'bg-green-100 text-green-700'
-                    : r.estado === 'tarde'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-red-100 text-red-700'
-                }`}
-              >
-                {r.estado}
-              </span>
+              <Badge tone={toneForEstado(r.estado)}>{r.estado}</Badge>
             </li>
           ))}
         </ul>
@@ -467,27 +445,21 @@ function ActividadTab() {
   if (error) return <ErrorMessage message={error} onRetry={load} />
 
   return (
-    <div className="bg-white rounded-xl shadow p-4">
-      <h2 className="text-lg font-semibold text-slate-800 mb-3">Actividad (escaneos)</h2>
+    <div className="bg-white rounded-xl border border-ink/10 p-5">
+      <h2 className="font-display text-xl text-ink mb-3">Actividad (escaneos)</h2>
       {logs.length === 0 ? (
-        <p className="text-slate-500 text-sm">Sin actividad todavía.</p>
+        <p className="text-ink/40 text-sm">Sin actividad todavía.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-slate-100">
+        <ul className="flex flex-col divide-y divide-ink/5">
           {logs.map((l, i) => (
-            <li key={i} className="py-2 flex justify-between items-center text-sm gap-2">
+            <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
               <div className="min-w-0">
-                <p className="font-medium text-slate-700 truncate">{l.estudiante ?? 'Desconocido'}</p>
-                <p className="text-slate-500 truncate">
+                <p className="font-medium text-ink truncate">{l.estudiante ?? 'Desconocido'}</p>
+                <p className="text-ink/50 truncate">
                   {l.dispositivo} · {l.aula} · {new Date(l.created_at).toLocaleString('es-AR')}
                 </p>
               </div>
-              <span
-                className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium ${
-                  RESULT_COLORS[l.result] ?? 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {l.result}
-              </span>
+              <Badge tone={toneForEstado(l.result)}>{l.result}</Badge>
             </li>
           ))}
         </ul>

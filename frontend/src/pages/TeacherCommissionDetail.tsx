@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
+import Badge, { toneForEstado } from '../components/Badge'
+import AppHeader from '../components/AppHeader'
 
 interface EnrolledStudent {
   student_profile_id: string
@@ -26,12 +28,6 @@ interface StudentStat {
   total_registros: number
   presentes: number
   tardes: number
-}
-
-const ESTADO_COLORS: Record<string, string> = {
-  presente: 'bg-green-100 text-green-700',
-  tarde: 'bg-yellow-100 text-yellow-700',
-  ausente: 'bg-red-100 text-red-700',
 }
 
 type Tab = 'estudiantes' | 'asistencia' | 'stats'
@@ -71,21 +67,17 @@ export default function TeacherCommissionDetail() {
   }, [load])
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-      <div className="max-w-2xl mx-auto flex flex-col gap-4">
-        <div className="flex flex-wrap justify-between items-center gap-2">
-          <h1 className="text-xl font-bold text-blue-600">Detalle de la comisión</h1>
-          <Link to="/dashboard" className="text-blue-600 text-sm hover:underline">
-            ← Volver
-          </Link>
-        </div>
+    <div className="min-h-screen bg-paper">
+      <AppHeader backTo={{ to: '/dashboard', label: 'Volver' }} />
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
+        <h1 className="font-display text-2xl text-ink">Detalle de la comisión</h1>
 
         {loading && <Spinner />}
         {error && <ErrorMessage message={error} onRetry={load} />}
 
         {!loading && !error && (
           <>
-            <div className="flex gap-1 bg-white rounded-xl shadow p-1 overflow-x-auto">
+            <div className="flex gap-1 bg-white rounded-xl border border-ink/10 p-1 overflow-x-auto">
               {(
                 [
                   ['estudiantes', 'Estudiantes'],
@@ -96,8 +88,8 @@ export default function TeacherCommissionDetail() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                    tab === key ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+                  className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                    tab === key ? 'bg-ink text-paper' : 'text-ink/60 hover:bg-paper'
                   }`}
                 >
                   {label}
@@ -106,23 +98,23 @@ export default function TeacherCommissionDetail() {
             </div>
 
             {tab === 'estudiantes' && (
-              <div className="bg-white rounded-xl shadow p-4">
+              <div className="bg-white rounded-xl border border-ink/10 p-5">
                 {students.length === 0 ? (
-                  <p className="text-slate-500 text-sm">No hay estudiantes inscriptos.</p>
+                  <p className="text-ink/40 text-sm">No hay estudiantes inscriptos.</p>
                 ) : (
-                  <ul className="flex flex-col divide-y divide-slate-100">
+                  <ul className="flex flex-col divide-y divide-ink/5">
                     {students.map((s) => (
                       <li
                         key={s.student_profile_id}
-                        className="py-2 flex justify-between items-center text-sm gap-2"
+                        className="py-2.5 flex justify-between items-center text-sm gap-2"
                       >
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-700 truncate">{s.nombre}</p>
-                          <p className="text-slate-500">Legajo {s.legajo}</p>
+                          <p className="font-medium text-ink truncate">{s.nombre}</p>
+                          <p className="text-ink/50">Legajo {s.legajo}</p>
                         </div>
-                        <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 capitalize">
+                        <Badge tone={toneForEstado(s.estado_inscripcion)}>
                           {s.estado_inscripcion}
-                        </span>
+                        </Badge>
                       </li>
                     ))}
                   </ul>
@@ -131,26 +123,20 @@ export default function TeacherCommissionDetail() {
             )}
 
             {tab === 'asistencia' && (
-              <div className="bg-white rounded-xl shadow p-4">
+              <div className="bg-white rounded-xl border border-ink/10 p-5">
                 {attendance.length === 0 ? (
-                  <p className="text-slate-500 text-sm">Todavía no hay asistencia registrada.</p>
+                  <p className="text-ink/40 text-sm">Todavía no hay asistencia registrada.</p>
                 ) : (
-                  <ul className="flex flex-col divide-y divide-slate-100">
+                  <ul className="flex flex-col divide-y divide-ink/5">
                     {attendance.map((a, i) => (
-                      <li key={i} className="py-2 flex justify-between items-center text-sm gap-2">
+                      <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
                         <div className="min-w-0">
-                          <p className="font-medium text-slate-700 truncate">{a.estudiante}</p>
-                          <p className="text-slate-500">
+                          <p className="font-medium text-ink truncate">{a.estudiante}</p>
+                          <p className="text-ink/50">
                             {a.fecha} · {a.hora.slice(0, 5)} · Legajo {a.legajo}
                           </p>
                         </div>
-                        <span
-                          className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                            ESTADO_COLORS[a.estado] ?? 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {a.estado}
-                        </span>
+                        <Badge tone={toneForEstado(a.estado)}>{a.estado}</Badge>
                       </li>
                     ))}
                   </ul>
@@ -159,15 +145,15 @@ export default function TeacherCommissionDetail() {
             )}
 
             {tab === 'stats' && (
-              <div className="bg-white rounded-xl shadow p-4">
+              <div className="bg-white rounded-xl border border-ink/10 p-5">
                 {stats.length === 0 ? (
-                  <p className="text-slate-500 text-sm">No hay estudiantes inscriptos.</p>
+                  <p className="text-ink/40 text-sm">No hay estudiantes inscriptos.</p>
                 ) : (
-                  <ul className="flex flex-col divide-y divide-slate-100">
+                  <ul className="flex flex-col divide-y divide-ink/5">
                     {stats.map((s) => (
-                      <li key={s.student_profile_id} className="py-2 text-sm">
-                        <p className="font-medium text-slate-700">{s.nombre}</p>
-                        <p className="text-slate-500">
+                      <li key={s.student_profile_id} className="py-2.5 text-sm">
+                        <p className="font-medium text-ink">{s.nombre}</p>
+                        <p className="text-ink/50">
                           {s.total_registros} registros · {s.presentes} presente
                           {s.presentes !== 1 ? 's' : ''} · {s.tardes} tarde
                           {s.tardes !== 1 ? 's' : ''}

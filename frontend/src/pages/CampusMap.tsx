@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
+import AppHeader from '../components/AppHeader'
 
-// Fix conocido de Leaflet + bundlers (Vite/Webpack): los íconos default
-// no se resuelven solos, hay que apuntarlos a mano a una CDN.
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -54,19 +52,17 @@ const TIPO_EMOJI: Record<string, string> = {
   otro: '📍',
 }
 
-// Marcador con fondo blanco circular para que el emoji se vea bien
-// aunque el mapa base tenga sus propios íconos en ese punto.
 function locationIcon(tipo: string) {
   return L.divIcon({
     html: `
       <div style="
         width: 32px; height: 32px;
         background: white;
-        border: 2px solid #2563eb;
+        border: 2px solid #2b4fd6;
         border-radius: 9999px;
         display: flex; align-items: center; justify-content: center;
         font-size: 16px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        box-shadow: 0 1px 4px rgba(20,24,43,0.35);
       ">${TIPO_EMOJI[tipo] ?? '📍'}</div>
     `,
     className: '',
@@ -114,20 +110,16 @@ export default function CampusMap() {
       : [-31.2503, -61.4867]
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6">
-      <div className="max-w-2xl mx-auto flex flex-col gap-4">
-        <div className="flex flex-wrap justify-between items-center gap-2">
-          <h1 className="text-xl font-bold text-blue-600">Mapa del campus</h1>
-          <Link to="/dashboard" className="text-blue-600 text-sm hover:underline">
-            ← Volver al dashboard
-          </Link>
-        </div>
+    <div className="min-h-screen bg-paper">
+      <AppHeader backTo={{ to: '/dashboard', label: 'Dashboard' }} />
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
+        <h1 className="font-display text-2xl text-ink">Mapa del campus</h1>
 
         {loading && <Spinner label="Cargando el mapa..." />}
         {error && <ErrorMessage message={error} onRetry={load} />}
 
         {!loading && !error && data && (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="bg-white rounded-xl border border-ink/10 overflow-hidden">
             <MapContainer center={center} zoom={17} style={{ height: '450px', width: '100%' }}>
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -166,8 +158,8 @@ export default function CampusMap() {
         )}
 
         {!loading && buildingsWithoutCoords.length > 0 && (
-          <div className="bg-white rounded-xl shadow p-4">
-            <p className="text-slate-500 text-sm">
+          <div className="border-l-4 border-amber bg-white rounded-r-xl p-4">
+            <p className="text-ink/60 text-sm">
               Edificios sin coordenadas cargadas todavía (no aparecen en el mapa):{' '}
               {buildingsWithoutCoords.map((b) => b.nombre).join(', ')}
             </p>

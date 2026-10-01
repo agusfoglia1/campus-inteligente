@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
+import Badge, { toneForEstado } from '../components/Badge'
 
 interface ClassInfo {
   commission_id: string
@@ -36,12 +37,6 @@ interface StudentDashboardData {
   historial_reciente: AttendanceHistoryItem[]
 }
 
-const ESTADO_COLORS: Record<string, string> = {
-  presente: 'bg-green-100 text-green-700',
-  tarde: 'bg-yellow-100 text-yellow-700',
-  ausente: 'bg-red-100 text-red-700',
-}
-
 function formatHora(hora: string) {
   return hora.slice(0, 5)
 }
@@ -70,81 +65,81 @@ export default function StudentDashboard() {
   if (!data) return null
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-800">Legajo: {data.legajo}</h2>
-      </div>
+    <div className="flex flex-col gap-4">
+      <p className="text-ink/50 text-sm">Legajo {data.legajo}</p>
 
-      {/* Próxima clase */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <h3 className="text-sm font-medium text-blue-700 mb-2">Próxima clase</h3>
-        {data.proxima_clase ? (
-          <div>
-            <p className="text-lg font-semibold text-slate-800">{data.proxima_clase.materia}</p>
-            <p className="text-slate-600">
-              {data.proxima_clase.dia} {formatHora(data.proxima_clase.hora_inicio)}–
-              {formatHora(data.proxima_clase.hora_fin)} · Aula {data.proxima_clase.aula} (
-              {data.proxima_clase.edificio})
-            </p>
-            {data.proxima_clase.docente && (
-              <p className="text-slate-500 text-sm">Docente: {data.proxima_clase.docente}</p>
-            )}
-          </div>
-        ) : (
-          <p className="text-slate-500">No tenés ninguna clase próxima cargada.</p>
-        )}
-      </div>
-
-      {/* Materias del día + % asistencia */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow p-4">
-          <h3 className="text-sm font-medium text-slate-500 mb-2">Materias de hoy</h3>
-          {data.materias_del_dia.length === 0 ? (
-            <p className="text-slate-500 text-sm">No tenés clases hoy.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
+        {/* Próxima clase */}
+        <div className="border-l-4 border-cobalt bg-white rounded-r-xl p-5">
+          <p className="text-cobalt text-sm font-medium mb-1">Próxima clase</p>
+          {data.proxima_clase ? (
+            <>
+              <p className="font-display text-2xl text-ink">{data.proxima_clase.materia}</p>
+              <p className="text-ink/60 mt-1">
+                {data.proxima_clase.dia} · {formatHora(data.proxima_clase.hora_inicio)}–
+                {formatHora(data.proxima_clase.hora_fin)}
+              </p>
+              <p className="text-ink/60">
+                Aula {data.proxima_clase.aula}, {data.proxima_clase.edificio}
+              </p>
+              {data.proxima_clase.docente && (
+                <p className="text-ink/40 text-sm mt-2">{data.proxima_clase.docente}</p>
+              )}
+            </>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {data.materias_del_dia.map((c) => (
-                <li key={c.commission_id} className="text-sm">
-                  <span className="font-medium">{c.materia}</span>{' '}
-                  <span className="text-slate-500">
-                    {formatHora(c.hora_inicio)}–{formatHora(c.hora_fin)} · {c.aula}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <p className="text-ink/40">No tenés ninguna clase próxima cargada.</p>
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow p-4 flex flex-col justify-center items-center">
-          <h3 className="text-sm font-medium text-slate-500 mb-2">% de asistencia</h3>
-          <p className="text-3xl font-bold text-blue-600">
-            {data.porcentaje_asistencia !== null ? `${data.porcentaje_asistencia}%` : '—'}
+        {/* % asistencia, como número grande: es el dato más importante del dashboard */}
+        <div className="bg-ink text-paper rounded-xl p-5 flex flex-col items-center justify-center text-center">
+          <p className="font-display text-5xl">
+            {data.porcentaje_asistencia !== null ? (
+              <>
+                {data.porcentaje_asistencia}
+                <span className="text-2xl align-top">%</span>
+              </>
+            ) : (
+              '—'
+            )}
           </p>
+          <p className="text-paper/50 text-sm mt-1">de asistencia</p>
         </div>
       </div>
 
-      {/* Historial reciente */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="text-sm font-medium text-slate-500 mb-3">Historial reciente</h3>
-        {data.historial_reciente.length === 0 ? (
-          <p className="text-slate-500 text-sm">Todavía no tenés asistencias registradas.</p>
+      <div className="bg-white rounded-xl border border-ink/10 p-5">
+        <p className="text-ink/50 text-sm font-medium mb-3">Materias de hoy</p>
+        {data.materias_del_dia.length === 0 ? (
+          <p className="text-ink/40 text-sm">No tenés clases hoy.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-slate-100">
+          <ul className="flex flex-col divide-y divide-ink/5">
+            {data.materias_del_dia.map((c) => (
+              <li key={c.commission_id} className="py-2.5 flex justify-between text-sm gap-2">
+                <span className="font-medium text-ink">{c.materia}</span>
+                <span className="text-ink/50 shrink-0">
+                  {formatHora(c.hora_inicio)}–{formatHora(c.hora_fin)} · {c.aula}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-ink/10 p-5">
+        <p className="text-ink/50 text-sm font-medium mb-3">Historial reciente</p>
+        {data.historial_reciente.length === 0 ? (
+          <p className="text-ink/40 text-sm">Todavía no tenés asistencias registradas.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-ink/5">
             {data.historial_reciente.map((h, i) => (
-              <li key={i} className="py-2 flex justify-between items-center text-sm gap-2">
+              <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-700 truncate">{h.materia}</p>
-                  <p className="text-slate-500">
+                  <p className="font-medium text-ink truncate">{h.materia}</p>
+                  <p className="text-ink/50">
                     {h.fecha} · {formatHora(h.hora)} · {h.aula}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                    ESTADO_COLORS[h.estado] ?? 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {h.estado}
-                </span>
+                <Badge tone={toneForEstado(h.estado)}>{h.estado}</Badge>
               </li>
             ))}
           </ul>
