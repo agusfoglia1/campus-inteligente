@@ -63,13 +63,14 @@ interface ScanLogAdmin {
   result: string
 }
 
-type Tab = 'resumen' | 'estudiantes' | 'academico' | 'aprobaciones' | 'dispositivos' | 'asistencias' | 'actividad'
+type Tab = 'resumen' | 'estudiantes' | 'academico' | 'aprobaciones' | 'comunicados' | 'dispositivos' | 'asistencias' | 'actividad'
 
 const TABS: [Tab, string][] = [
   ['resumen', 'Resumen'],
   ['estudiantes', 'Estudiantes'],
   ['academico', 'Gestión académica'],
   ['aprobaciones', 'Aprobaciones'],
+  ['comunicados', 'Comunicados'],
   ['dispositivos', 'Dispositivos'],
   ['asistencias', 'Asistencias'],
   ['actividad', 'Actividad'],
@@ -98,11 +99,68 @@ export default function AdminDashboard() {
       {tab === 'estudiantes' && <EstudiantesTab />}
       {tab === 'academico' && <AcademicManagementTab />}
       {tab === 'aprobaciones' && <AprobacionesTab />}
+      {tab === 'comunicados' && <ComunicadosTab />}
       {tab === 'dispositivos' && <DispositivosTab />}
       {tab === 'asistencias' && <AsistenciasTab />}
       {tab === 'actividad' && <ActividadTab />}
     </div>
   )
+}
+
+interface AnnouncementAdmin {
+  id: string
+  titulo: string
+  contenido: string
+  publicado: boolean
+  autor_nombre: string | null
+  created_at: string
+}
+
+function ComunicadosTab() {
+  const [items, setItems] = useState<AnnouncementAdmin[]>([])
+  const [titulo, setTitulo] = useState('')
+  const [contenido, setContenido] = useState('')
+  const [publicar, setPublicar] = useState(true)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(() => {
+    setError('')
+    api.get<AnnouncementAdmin[]>('/announcements/admin')
+      .then((response) => setItems(response.data))
+      .catch((err) => setError(getErrorMessage(err, 'No se pudieron cargar los comunicados.')))
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setBusy(true); setError(''); setMessage('')
+    try {
+      await api.post('/announcements/admin', { titulo, contenido, publicado: publicar })
+      setTitulo(''); setContenido(''); setMessage('Comunicado guardado.'); load()
+    } catch (err) { setError(getErrorMessage(err, 'No se pudo guardar el comunicado.')) }
+    finally { setBusy(false) }
+  }
+
+  async function toggle(item: AnnouncementAdmin) {
+    setBusy(true); setError(''); setMessage('')
+    try { await api.put(`/announcements/admin/${item.id}`, { publicado: !item.publicado }); load() }
+    catch (err) { setError(getErrorMessage(err, 'No se pudo cambiar la publicación.')) }
+    finally { setBusy(false) }
+  }
+
+  return <section className="flex flex-col gap-4">
+    <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Información institucional</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Comunicados</h2><p className="mt-1 text-sm text-ink/50">Publicá avisos visibles en los dashboards del campus.</p></div>
+    {error && <ErrorMessage message={error} onRetry={load} />}
+    {message && <p role="status" className="rounded-xl bg-signal-soft px-4 py-3 text-sm font-semibold text-signal">{message}</p>}
+    <form onSubmit={submit} className="flex flex-col gap-3 rounded-3xl border border-ink/10 bg-white p-5 shadow-sm">
+      <label className="text-sm font-bold text-ink">Título<input required minLength={4} maxLength={140} value={titulo} onChange={e=>setTitulo(e.target.value)} className="mt-1.5 w-full rounded-xl border border-ink/15 bg-paper px-3 py-2.5 font-normal outline-none focus:border-cobalt" placeholder="Por ejemplo: Inscripción a exámenes" /></label>
+      <label className="text-sm font-bold text-ink">Mensaje<textarea required minLength={10} maxLength={5000} rows={4} value={contenido} onChange={e=>setContenido(e.target.value)} className="mt-1.5 w-full resize-y rounded-xl border border-ink/15 bg-paper px-3 py-2.5 font-normal outline-none focus:border-cobalt" placeholder="Escribí la información para estudiantes y docentes…" /></label>
+      <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm text-ink/65"><input type="checkbox" checked={publicar} onChange={e=>setPublicar(e.target.checked)} className="accent-cobalt" />Publicar inmediatamente</label><button disabled={busy} className="rounded-full bg-cobalt px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy?'Guardando…':'Guardar comunicado'}</button></div>
+    </form>
+    <div className="flex flex-col gap-3">{items.length===0?<p className="rounded-2xl bg-white p-5 text-sm text-ink/50">Todavía no hay comunicados.</p>:items.map(item=><article key={item.id} className="rounded-2xl border border-ink/10 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display font-bold text-ink">{item.titulo}</h3><p className="mt-1 text-xs text-ink/40">{new Date(item.created_at).toLocaleDateString('es-AR')} · {item.autor_nombre??'Administración'}</p></div><button disabled={busy} onClick={()=>toggle(item)} className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-bold text-ink/65 disabled:opacity-50">{item.publicado?'Despublicar':'Publicar'}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink/65">{item.contenido}</p></article>)}</div>
+  </section>
 }
 
 function AprobacionesTab() {
@@ -405,16 +463,20 @@ function AsistenciasTab() {
   const [rows, setRows] = useState<AttendanceAdmin[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const [estado, setEstado] = useState('')
+  const [search, setSearch] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
     setError('')
     api
-      .get<AttendanceAdmin[]>('/admin/attendances')
+      .get<AttendanceAdmin[]>('/admin/attendances', { params: { limit: 1000, desde: desde || undefined, hasta: hasta || undefined, estado: estado || undefined } })
       .then((res) => setRows(res.data))
       .catch((err) => setError(getErrorMessage(err, 'No se pudieron cargar las asistencias.')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [desde, hasta, estado])
 
   useEffect(() => {
     load()
@@ -423,21 +485,35 @@ function AsistenciasTab() {
   if (loading) return <Spinner />
   if (error) return <ErrorMessage message={error} onRetry={load} />
 
+  const normalizedSearch = search.trim().toLocaleLowerCase('es')
+  const filteredRows = rows.filter((row) => !normalizedSearch ||
+    `${row.estudiante} ${row.legajo} ${row.materia} ${row.comision} ${row.aula}`.toLocaleLowerCase('es').includes(normalizedSearch))
+  const count = (status: string) => filteredRows.filter((row) => row.estado === status).length
+
   return (
     <div className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-xs font-bold uppercase tracking-[.15em] text-cobalt">Registro académico</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Asistencias del campus</h2></div>
         <button type="button" onClick={() => downloadCsv('asistencias-campus.csv',
           ['Fecha', 'Hora', 'Estudiante', 'Legajo', 'Materia', 'Comisión', 'Aula', 'Estado'],
-          rows.map((row) => [row.fecha, row.hora, row.estudiante, row.legajo, row.materia, row.comision, row.aula, row.estado])
-        )} disabled={rows.length === 0} className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cobalt disabled:cursor-not-allowed disabled:opacity-40">Exportar CSV ↓</button>
+          filteredRows.map((row) => [row.fecha, row.hora, row.estudiante, row.legajo, row.materia, row.comision, row.aula, row.estado])
+        )} disabled={filteredRows.length === 0} className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cobalt disabled:cursor-not-allowed disabled:opacity-40">Exportar filtradas ↓</button>
       </div>
-      {rows.length === 0 ? (
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {[['Registros', filteredRows.length], ['Presentes', count('presente')], ['Tarde', count('tarde')], ['Ausentes', count('ausente')]].map(([label, value]) => <div key={label} className="rounded-2xl bg-paper p-3"><p className="font-display text-2xl font-extrabold text-ink">{value}</p><p className="text-xs font-semibold text-ink/50">{label}</p></div>)}
+      </div>
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <input aria-label="Buscar asistencia" type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Estudiante, materia, aula…" className="rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm outline-none focus:border-cobalt" />
+        <label className="text-xs font-semibold text-ink/50">Desde<input aria-label="Desde" type="date" value={desde} max={hasta || undefined} onChange={e=>setDesde(e.target.value)} className="mt-1 block w-full rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm text-ink" /></label>
+        <label className="text-xs font-semibold text-ink/50">Hasta<input aria-label="Hasta" type="date" value={hasta} min={desde || undefined} onChange={e=>setHasta(e.target.value)} className="mt-1 block w-full rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm text-ink" /></label>
+        <select aria-label="Filtrar por estado" value={estado} onChange={e=>setEstado(e.target.value)} className="rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm"><option value="">Todos los estados</option><option value="presente">Presente</option><option value="tarde">Tarde</option><option value="ausente">Ausente</option></select>
+      </div>
+      {filteredRows.length === 0 ? (
         <p className="text-ink/40 text-sm">Todavía no hay asistencias registradas.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-ink/5">
-          {rows.map((r, i) => (
-            <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
+          {filteredRows.map((r, i) => (
+            <li key={`${r.fecha}-${r.hora}-${r.legajo}-${i}`} className="py-2.5 flex justify-between items-center text-sm gap-2">
               <div className="min-w-0">
                 <p className="font-medium text-ink truncate">
                   {r.estudiante} <span className="text-ink/40">({r.legajo})</span>

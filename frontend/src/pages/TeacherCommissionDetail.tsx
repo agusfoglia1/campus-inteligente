@@ -47,6 +47,10 @@ export default function TeacherCommissionDetail() {
   const [manualStatus, setManualStatus] = useState('presente')
   const [manualMessage, setManualMessage] = useState('')
   const [manualBusy, setManualBusy] = useState(false)
+  const [attendanceFrom, setAttendanceFrom] = useState('')
+  const [attendanceTo, setAttendanceTo] = useState('')
+  const [attendanceStatus, setAttendanceStatus] = useState('')
+  const [attendanceSearch, setAttendanceSearch] = useState('')
 
   const load = useCallback(() => {
     if (!commissionId) return
@@ -81,6 +85,15 @@ export default function TeacherCommissionDetail() {
     } catch (err) { setManualMessage(getErrorMessage(err, 'No se pudo registrar la asistencia.')) }
     finally { setManualBusy(false) }
   }
+
+  const visibleAttendance = attendance.filter((row) => {
+    if (attendanceFrom && row.fecha < attendanceFrom) return false
+    if (attendanceTo && row.fecha > attendanceTo) return false
+    if (attendanceStatus && row.estado !== attendanceStatus) return false
+    const query = attendanceSearch.trim().toLocaleLowerCase('es')
+    return !query || `${row.estudiante} ${row.legajo}`.toLocaleLowerCase('es').includes(query)
+  })
+  const attendanceCount = (status: string) => visibleAttendance.filter((row) => row.estado === status).length
 
   return (
     <div className="min-h-screen bg-paper">
@@ -147,15 +160,17 @@ export default function TeacherCommissionDetail() {
                   <div><p className="text-xs font-bold uppercase tracking-[.15em] text-cobalt">Registro de clase</p><h2 className="mt-1 font-display text-lg font-extrabold text-ink">Asistencia de la comisión</h2></div>
                   <button type="button" onClick={() => downloadCsv('asistencia-comision.csv',
                     ['Fecha', 'Hora', 'Estudiante', 'Legajo', 'Estado'],
-                    attendance.map((row) => [row.fecha, row.hora, row.estudiante, row.legajo, row.estado])
-                  )} disabled={attendance.length === 0} className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cobalt disabled:cursor-not-allowed disabled:opacity-40">Exportar CSV ↓</button>
+                    visibleAttendance.map((row) => [row.fecha, row.hora, row.estudiante, row.legajo, row.estado])
+                  )} disabled={visibleAttendance.length === 0} className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cobalt disabled:cursor-not-allowed disabled:opacity-40">Exportar filtradas ↓</button>
                 </div>
-                {attendance.length === 0 ? (
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{[['Registros',visibleAttendance.length],['Presentes',attendanceCount('presente')],['Tarde',attendanceCount('tarde')],['Ausentes',attendanceCount('ausente')]].map(([label,value])=><div key={label} className="rounded-2xl bg-paper p-3"><p className="font-display text-xl font-extrabold text-ink">{value}</p><p className="text-xs font-semibold text-ink/50">{label}</p></div>)}</div>
+                <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><input aria-label="Buscar estudiante" type="search" value={attendanceSearch} onChange={e=>setAttendanceSearch(e.target.value)} placeholder="Buscar estudiante o legajo…" className="rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm outline-none focus:border-cobalt"/><label className="text-xs font-semibold text-ink/50">Desde<input aria-label="Desde" type="date" value={attendanceFrom} max={attendanceTo||undefined} onChange={e=>setAttendanceFrom(e.target.value)} className="mt-1 block w-full rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm text-ink"/></label><label className="text-xs font-semibold text-ink/50">Hasta<input aria-label="Hasta" type="date" value={attendanceTo} min={attendanceFrom||undefined} onChange={e=>setAttendanceTo(e.target.value)} className="mt-1 block w-full rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm text-ink"/></label><select aria-label="Filtrar por estado" value={attendanceStatus} onChange={e=>setAttendanceStatus(e.target.value)} className="rounded-xl border border-ink/15 bg-paper px-3 py-2 text-sm"><option value="">Todos los estados</option><option value="presente">Presente</option><option value="tarde">Tarde</option><option value="ausente">Ausente</option></select></div>
+                {visibleAttendance.length === 0 ? (
                   <p className="text-ink/40 text-sm">Todavía no hay asistencia registrada.</p>
                 ) : (
                   <ul className="flex flex-col divide-y divide-ink/5">
-                    {attendance.map((a, i) => (
-                      <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
+                    {visibleAttendance.map((a, i) => (
+                      <li key={`${a.fecha}-${a.hora}-${a.legajo}-${i}`} className="py-2.5 flex justify-between items-center text-sm gap-2">
                         <div className="min-w-0">
                           <p className="font-medium text-ink truncate">{a.estudiante}</p>
                           <p className="text-ink/50">

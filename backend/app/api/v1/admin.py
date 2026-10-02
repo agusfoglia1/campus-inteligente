@@ -1,6 +1,7 @@
+import datetime as dt
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
@@ -185,8 +186,11 @@ def list_all_attendances(
     _=Depends(require_admin),
     student_profile_id: uuid.UUID | None = None,
     commission_id: uuid.UUID | None = None,
-    fecha: str | None = None,
-    limit: int = 100,
+    fecha: dt.date | None = None,
+    desde: dt.date | None = None,
+    hasta: dt.date | None = None,
+    estado: AttendanceStatus | None = None,
+    limit: int = Query(default=1000, ge=1, le=2000),
 ):
     query = (
         db.query(Attendance, StudentProfile, User, Commission, Subject, Classroom)
@@ -202,6 +206,12 @@ def list_all_attendances(
         query = query.filter(Attendance.commission_id == commission_id)
     if fecha:
         query = query.filter(Attendance.fecha == fecha)
+    if desde:
+        query = query.filter(Attendance.fecha >= desde)
+    if hasta:
+        query = query.filter(Attendance.fecha <= hasta)
+    if estado:
+        query = query.filter(Attendance.estado == estado)
 
     rows = query.order_by(Attendance.fecha.desc(), Attendance.hora.desc()).limit(limit).all()
     return [

@@ -46,6 +46,11 @@ export default function StudentDashboard() {
   const [data, setData] = useState<StudentDashboardData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [classAlertsEnabled, setClassAlertsEnabled] = useState(() =>
+    typeof window !== 'undefined' && 'Notification' in window &&
+    Notification.permission === 'granted' && localStorage.getItem('class-alerts-enabled') === 'true'
+  )
+  const [classAlertMessage, setClassAlertMessage] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -60,6 +65,54 @@ export default function StudentDashboard() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    const next = data?.proxima_clase
+    if (!classAlertsEnabled || !next || !('Notification' in window) || Notification.permission !== 'granted') return
+
+    const startsAt = new Date(`${next.fecha}T${next.hora_inicio}`).getTime()
+    const reminderKey = `${next.commission_id}:${next.fecha}:${next.hora_inicio}`
+    const reminderAt = startsAt - 15 * 60 * 1000
+    const timeout = window.setTimeout(() => {
+      if (localStorage.getItem('class-alert-last') !== reminderKey && Notification.permission === 'granted') {
+        const minutes = Math.max(1, Math.ceil((startsAt - Date.now()) / 60000))
+        new Notification(`Próxima clase: ${next.materia}`, {
+          body: `Empieza en ${minutes} min · Aula ${next.aula} · ${next.edificio}`,
+          tag: reminderKey,
+        })
+        localStorage.setItem('class-alert-last', reminderKey)
+      }
+      api.get<StudentDashboardData>('/students/me/dashboard').then((res) => setData(res.data))
+    }, Math.max(0, reminderAt - Date.now()))
+
+    return () => window.clearTimeout(timeout)
+  }, [classAlertsEnabled, data?.proxima_clase?.commission_id, data?.proxima_clase?.fecha, data?.proxima_clase?.hora_inicio])
+
+  async function toggleClassAlerts() {
+    setClassAlertMessage('')
+    if (classAlertsEnabled) {
+      localStorage.removeItem('class-alerts-enabled')
+      setClassAlertsEnabled(false)
+      setClassAlertMessage('Avisos desactivados.')
+      return
+    }
+    if (!('Notification' in window)) {
+      setClassAlertMessage('Este navegador no admite notificaciones.')
+      return
+    }
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setClassAlertMessage('No se habilitaron las notificaciones. Podés cambiar el permiso desde el navegador.')
+        return
+      }
+      localStorage.setItem('class-alerts-enabled', 'true')
+      setClassAlertsEnabled(true)
+      setClassAlertMessage('Listo: recibirás un aviso 15 minutos antes. El dashboard debe permanecer abierto.')
+    } catch {
+      setClassAlertMessage('No se pudo activar el permiso de notificaciones en este navegador.')
+    }
+  }
 
   if (loading) return <Spinner label="Cargando tu dashboard..." />
   if (error) return <ErrorMessage message={error} onRetry={load} />
@@ -95,6 +148,11 @@ export default function StudentDashboard() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   {data.proxima_clase.docente && <p className="text-sm text-ink/50">Docente · {data.proxima_clase.docente}</p>}
                   <Link to={`/mapa?destino=${encodeURIComponent(data.proxima_clase.edificio)}`} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-bold text-cobalt transition hover:bg-cobalt-soft">Cómo llegar <span aria-hidden="true">↗</span></Link>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-paper p-3.5">
+                  <div><p className="text-sm font-bold text-ink">Avisos de clase</p><p className="mt-0.5 text-xs text-ink/50">Recordatorio 15 minutos antes de la próxima clase.</p></div>
+                  <button type="button" onClick={toggleClassAlerts} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-cobalt shadow-sm transition hover:bg-cobalt hover:text-white">{classAlertsEnabled ? 'Desactivar avisos' : 'Activar avisos'}</button>
+                  {classAlertMessage && <p role="status" className="w-full text-xs text-ink/65">{classAlertMessage}</p>}
                 </div>
               </>
             ) : (

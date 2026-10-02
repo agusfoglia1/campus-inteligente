@@ -6,3 +6,4 @@ from app.models.attendance import Attendance  # noqa: F401
 from app.models.device import Device  # noqa: F401
 from app.models.scan_log import ScanLog, UsedQrToken  # noqa: F401
 from app.models.campus import CampusLocation  # noqa: F401
+from app.models.announcement import Announcement  # noqa: F401

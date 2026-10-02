@@ -119,7 +119,10 @@ def get_commission_attendance(
     commission_id: uuid.UUID,
     teacher: TeacherProfile = Depends(get_current_teacher_profile),
     db: Session = Depends(get_db),
-    fecha: str | None = None,
+    fecha: dt.date | None = None,
+    desde: dt.date | None = None,
+    hasta: dt.date | None = None,
+    estado: AttendanceStatus | None = None,
 ):
     """Todos los registros de asistencia de una comisión (quién asistió, cuándo).
     Opcionalmente filtrable por fecha exacta (YYYY-MM-DD)."""
@@ -133,6 +136,12 @@ def get_commission_attendance(
     )
     if fecha:
         query = query.filter(Attendance.fecha == fecha)
+    if desde:
+        query = query.filter(Attendance.fecha >= desde)
+    if hasta:
+        query = query.filter(Attendance.fecha <= hasta)
+    if estado:
+        query = query.filter(Attendance.estado == estado)
 
     rows = query.order_by(Attendance.fecha.desc(), Attendance.hora.desc()).all()
     return [

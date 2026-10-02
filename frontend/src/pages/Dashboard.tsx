@@ -4,6 +4,7 @@ import AppHeader from '../components/AppHeader'
 import StudentDashboard from './StudentDashboard'
 import TeacherDashboard from './TeacherDashboard'
 import AdminDashboard from './AdminDashboard'
+import AnnouncementsPanel from '../components/AnnouncementsPanel'
 
 function CampusIllustration() {
   return (
@@ -72,6 +73,8 @@ export default function Dashboard() {
           {user?.role === 'student' && <QuickLink to="/perfil" marker="02" title="Mi perfil académico" detail="Revisá tus datos y avance académico." />}
           <QuickLink to="/mapa" marker="⌖" title="Mapa del campus" detail="Encontrá edificios y espacios universitarios." />
         </section>
+
+        <AnnouncementsPanel />
 
         {user?.role === 'student' && <StudentDashboard />}
         {user?.role === 'teacher' && <TeacherDashboard />}
