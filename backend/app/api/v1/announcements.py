@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models.announcement import Announcement
 from app.models.user import User
 from app.schemas.announcement import AnnouncementCreate, AnnouncementOut, AnnouncementUpdate
+from app.services.push import notify_announcement_subscribers
 
 router = APIRouter(prefix="/announcements", tags=["announcements"])
 
@@ -54,6 +55,8 @@ def create_announcement(
     db.add(item)
     db.commit()
     db.refresh(item)
+    if item.publicado:
+        notify_announcement_subscribers(db, item)
     return _out(item)
 
 
@@ -67,8 +70,11 @@ def update_announcement(
     item = db.query(Announcement).filter(Announcement.id == announcement_id).first()
     if item is None:
         raise HTTPException(status_code=404, detail="Comunicado no encontrado")
+    was_published = item.publicado
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(item, field, value)
     db.commit()
     db.refresh(item)
+    if item.publicado and not was_published:
+        notify_announcement_subscribers(db, item)
     return _out(item)

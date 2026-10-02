@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import InstallAppButton from './InstallAppButton'
 
 interface Props {
   backTo?: { to: string; label: string }
@@ -50,7 +51,8 @@ export default function AppHeader({ backTo }: Props) {
           <Link to="/mapa" className={navLink(pathname === '/mapa')}>Mapa del campus</Link>
         </nav>
 
-        <div className="ml-auto flex items-center gap-3 sm:ml-0">
+        <div className="ml-auto flex items-center gap-2 sm:ml-0 sm:gap-3">
+          <InstallAppButton />
           {user && (
             <div className="hidden items-center gap-2 sm:flex">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cobalt-soft text-sm font-bold uppercase text-ink">

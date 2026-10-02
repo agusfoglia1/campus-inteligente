@@ -5,6 +5,7 @@ import StudentDashboard from './StudentDashboard'
 import TeacherDashboard from './TeacherDashboard'
 import AdminDashboard from './AdminDashboard'
 import AnnouncementsPanel from '../components/AnnouncementsPanel'
+import PushNotificationsButton from '../components/PushNotificationsButton'
 
 function CampusIllustration() {
   return (
@@ -75,6 +76,7 @@ export default function Dashboard() {
         </section>
 
         <AnnouncementsPanel />
+        <PushNotificationsButton />
 
         {user?.role === 'student' && <StudentDashboard />}
         {user?.role === 'teacher' && <TeacherDashboard />}

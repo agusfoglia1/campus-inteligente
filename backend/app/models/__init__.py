@@ -7,3 +7,4 @@ from app.models.device import Device  # noqa: F401
 from app.models.scan_log import ScanLog, UsedQrToken  # noqa: F401
 from app.models.campus import CampusLocation  # noqa: F401
 from app.models.announcement import Announcement  # noqa: F401
+from app.models.push_subscription import PushSubscription  # noqa: F401
