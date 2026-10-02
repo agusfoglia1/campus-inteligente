@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
+from app.models.enrollment import EnrollmentStatus
+
 
 # --- Alta y edición de estudiantes (crea User + StudentProfile juntos) ---
 class StudentAdminCreate(BaseModel):
@@ -85,3 +87,19 @@ class StatsOut(BaseModel):
     total_asistencias_registradas: int
     asistencias_presente: int
     asistencias_tarde: int
+
+
+class EnrollmentReviewOut(BaseModel):
+    id: uuid.UUID
+    student_profile_id: uuid.UUID
+    estudiante: str
+    legajo: str
+    materia: str
+    materia_codigo: str
+    commission_id: uuid.UUID
+    comision: str
+    estado: str
+
+
+class EnrollmentReviewUpdate(BaseModel):
+    estado: EnrollmentStatus

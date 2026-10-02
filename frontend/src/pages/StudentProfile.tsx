@@ -1,0 +1,15 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import AppHeader from '../components/AppHeader'
+import Spinner from '../components/Spinner'
+import ErrorMessage from '../components/ErrorMessage'
+import { api, getErrorMessage } from '../lib/api'
+
+interface Profile { nombre:string; email:string; legajo:string; carrera:string; anio_ingreso:number|null; materias_total:number; materias_aprobadas:number; solicitudes_pendientes:number }
+
+export default function StudentProfile() {
+  const [profile, setProfile] = useState<Profile|null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => { api.get<Profile>('/students/me/perfil').then(r=>setProfile(r.data)).catch(e=>setError(getErrorMessage(e,'No se pudo cargar tu perfil.'))) }, [])
+  return <div className="min-h-screen bg-paper"><AppHeader backTo={{to:'/dashboard',label:'Inicio'}}/><main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12"><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Espacio personal</p><h1 className="mt-2 font-display text-3xl font-extrabold text-ink sm:text-4xl">Mi perfil académico</h1><p className="mt-2 text-sm text-ink/50">Tus datos y avance en la universidad.</p>{!profile&&!error&&<div className="mt-8"><Spinner/></div>}{error&&<div className="mt-6"><ErrorMessage message={error}/></div>}{profile&&<><section className="mt-7 rounded-3xl border border-ink/10 bg-white p-6 shadow-sm sm:p-8"><div className="flex items-center gap-4"><span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cobalt-soft font-display text-2xl font-extrabold text-cobalt">{profile.nombre.slice(0,1)}</span><div><h2 className="font-display text-2xl font-extrabold text-ink">{profile.nombre}</h2><p className="text-sm text-ink/50">{profile.email}</p></div></div><dl className="mt-7 grid gap-4 border-t border-ink/5 pt-6 sm:grid-cols-2"><div><dt className="text-xs font-bold uppercase tracking-wide text-ink/40">Legajo</dt><dd className="mt-1 font-semibold text-ink">{profile.legajo}</dd></div><div><dt className="text-xs font-bold uppercase tracking-wide text-ink/40">Carrera</dt><dd className="mt-1 font-semibold text-ink">{profile.carrera}</dd></div><div><dt className="text-xs font-bold uppercase tracking-wide text-ink/40">Año de ingreso</dt><dd className="mt-1 font-semibold text-ink">{profile.anio_ingreso??'No informado'}</dd></div></dl></section><section className="mt-4 grid grid-cols-3 gap-3">{[['Materias',profile.materias_total],['Aprobadas',profile.materias_aprobadas],['En revisión',profile.solicitudes_pendientes]].map(([label,value])=><div key={label} className="rounded-2xl border border-ink/10 bg-white p-4 sm:p-5"><p className="font-display text-2xl font-extrabold text-ink">{value}</p><p className="mt-1 text-xs font-semibold text-ink/50">{label}</p></div>)}</section><Link to="/materias" className="mt-5 inline-flex rounded-full bg-ink px-5 py-3 text-sm font-bold text-white hover:bg-cobalt">Ver mis materias →</Link></>}</main></div>
+}

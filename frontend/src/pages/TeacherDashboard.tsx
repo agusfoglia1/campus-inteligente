@@ -50,37 +50,44 @@ export default function TeacherDashboard() {
 
   if (commissions.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-ink/10 p-6 text-ink/40 text-center">
-        Todavía no tenés ninguna comisión a cargo.
+      <div className="rounded-3xl border border-ink/10 bg-white p-9 text-center shadow-sm">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cobalt-soft font-display text-xl font-extrabold text-cobalt">AC</span>
+        <p className="mt-4 font-display text-xl font-extrabold text-ink">Tus comisiones aparecerán acá</p>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink/50">Cuando tengas comisiones asignadas, vas a poder consultar horarios, estudiantes y asistencia desde este espacio.</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <section className="flex flex-col gap-4">
+      <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Espacio docente</p><h2 className="mt-1 font-display text-2xl font-extrabold text-ink">Tus comisiones</h2><p className="mt-1 text-sm text-ink/50">Seleccioná una comisión para ver estudiantes y actividad.</p></div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {commissions.map((c) => (
         <Link
           key={c.commission_id}
           to={`/teacher/commissions/${c.commission_id}`}
-          className="border-l-4 border-cobalt bg-white rounded-r-xl p-5 hover:bg-cobalt-soft/30 transition-colors block"
+          className="group relative overflow-hidden rounded-3xl border border-ink/10 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-cobalt/35 hover:shadow-lg hover:shadow-ink/[.06] sm:p-6"
         >
+          <div className="absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-cobalt-soft/70 transition group-hover:scale-110" />
           <div className="flex flex-wrap justify-between items-start gap-2">
-            <div>
-              <p className="font-display text-xl text-ink">{c.materia}</p>
-              <p className="text-ink/50 text-sm">{c.codigo}</p>
+            <div className="relative">
+              <p className="text-xs font-bold uppercase tracking-[.14em] text-cobalt">Comisión {c.codigo}</p>
+              <p className="mt-1 font-display text-xl font-extrabold text-ink">{c.materia}</p>
+              <p className="text-sm text-ink/45">{c.materia_codigo}</p>
             </div>
             <Badge tone="cobalt">{c.estado}</Badge>
           </div>
-          <ul className="mt-2 flex flex-col gap-0.5">
+          <ul className="relative mt-5 flex flex-col gap-2 border-t border-ink/5 pt-4">
             {c.horarios.map((h, i) => (
-              <li key={i} className="text-sm text-ink/60 capitalize">
-                {h.dia} {formatHora(h.hora_inicio)}–{formatHora(h.hora_fin)} · {h.aula} (
-                {h.edificio})
+              <li key={i} className="flex flex-wrap items-center gap-x-2 text-sm capitalize text-ink/60">
+                <span className="w-24 font-semibold text-ink">{h.dia}</span><span className="tabular-nums">{formatHora(h.hora_inicio)}–{formatHora(h.hora_fin)}</span><span className="text-ink/35">·</span><span>{h.aula} · {h.edificio}</span>
               </li>
             ))}
           </ul>
+          <p className="relative mt-5 flex items-center justify-between text-sm font-bold text-cobalt">Abrir comisión <span className="transition group-hover:translate-x-1">→</span></p>
         </Link>
       ))}
-    </div>
+      </div>
+    </section>
   )
 }

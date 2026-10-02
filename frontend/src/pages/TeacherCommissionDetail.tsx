@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import Badge, { toneForEstado } from '../components/Badge'
 import AppHeader from '../components/AppHeader'
+import { downloadCsv } from '../lib/exportCsv'
 
 interface EnrolledStudent {
   student_profile_id: string
@@ -41,6 +42,11 @@ export default function TeacherCommissionDetail() {
   const [stats, setStats] = useState<StudentStat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [manualStudent, setManualStudent] = useState('')
+  const [manualDate, setManualDate] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` })
+  const [manualStatus, setManualStatus] = useState('presente')
+  const [manualMessage, setManualMessage] = useState('')
+  const [manualBusy, setManualBusy] = useState(false)
 
   const load = useCallback(() => {
     if (!commissionId) return
@@ -66,18 +72,28 @@ export default function TeacherCommissionDetail() {
     load()
   }, [load])
 
+  async function saveManualAttendance() {
+    if (!commissionId || !manualStudent) return
+    setManualBusy(true); setManualMessage('')
+    try {
+      await api.post(`/teachers/me/commissions/${commissionId}/attendance/manual`, { student_profile_id: manualStudent, fecha: manualDate, estado: manualStatus })
+      setManualMessage('Asistencia registrada.'); load()
+    } catch (err) { setManualMessage(getErrorMessage(err, 'No se pudo registrar la asistencia.')) }
+    finally { setManualBusy(false) }
+  }
+
   return (
     <div className="min-h-screen bg-paper">
       <AppHeader backTo={{ to: '/dashboard', label: 'Volver' }} />
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
-        <h1 className="font-display text-2xl text-ink">Detalle de la comisión</h1>
+      <main className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-7 sm:px-6 sm:py-10">
+        <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Espacio docente</p><h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">Detalle de la comisión</h1><p className="mt-2 text-sm text-ink/50">Seguimiento de estudiantes, asistencia y actividad.</p></div>
 
         {loading && <Spinner />}
         {error && <ErrorMessage message={error} onRetry={load} />}
 
         {!loading && !error && (
           <>
-            <div className="flex gap-1 bg-white rounded-xl border border-ink/10 p-1 overflow-x-auto">
+            <div className="flex gap-1 rounded-full border border-ink/10 bg-white p-1 shadow-sm overflow-x-auto">
               {(
                 [
                   ['estudiantes', 'Estudiantes'],
@@ -88,8 +104,8 @@ export default function TeacherCommissionDetail() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    tab === key ? 'bg-ink text-paper' : 'text-ink/60 hover:bg-paper'
+                    className={`flex-1 min-w-fit px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+                    tab === key ? 'bg-ink text-white' : 'text-ink/60 hover:bg-cobalt-soft hover:text-ink'
                   }`}
                 >
                   {label}
@@ -98,7 +114,7 @@ export default function TeacherCommissionDetail() {
             </div>
 
             {tab === 'estudiantes' && (
-              <div className="bg-white rounded-xl border border-ink/10 p-5">
+              <div className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
                 {students.length === 0 ? (
                   <p className="text-ink/40 text-sm">No hay estudiantes inscriptos.</p>
                 ) : (
@@ -123,7 +139,17 @@ export default function TeacherCommissionDetail() {
             )}
 
             {tab === 'asistencia' && (
-              <div className="bg-white rounded-xl border border-ink/10 p-5">
+              <div className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
+                <div className="mb-5 rounded-2xl bg-paper p-4"><p className="font-bold text-ink">Cargar asistencia manual</p><p className="mt-1 text-xs text-ink/50">Solo se admite en días con clase programada para esta comisión.</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-4"><select aria-label="Estudiante" value={manualStudent} onChange={e=>setManualStudent(e.target.value)} className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm"><option value="">Elegí estudiante</option>{students.filter(s=>!['aprobada','desaprobada','libre'].includes(s.estado_inscripcion.toLowerCase())).map(s=><option key={s.student_profile_id} value={s.student_profile_id}>{s.nombre} · {s.legajo}</option>)}</select><input aria-label="Fecha" type="date" value={manualDate} onChange={e=>setManualDate(e.target.value)} className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm"/><select aria-label="Estado" value={manualStatus} onChange={e=>setManualStatus(e.target.value)} className="rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm"><option value="presente">Presente</option><option value="tarde">Tarde</option><option value="ausente">Ausente</option></select><button type="button" disabled={!manualStudent||manualBusy} onClick={saveManualAttendance} className="rounded-full bg-cobalt px-4 py-2 text-sm font-bold text-white disabled:opacity-40">{manualBusy?'Guardando…':'Registrar'}</button></div>{manualMessage&&<p role="status" className="mt-2 text-sm text-ink/65">{manualMessage}</p>}
+                </div>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div><p className="text-xs font-bold uppercase tracking-[.15em] text-cobalt">Registro de clase</p><h2 className="mt-1 font-display text-lg font-extrabold text-ink">Asistencia de la comisión</h2></div>
+                  <button type="button" onClick={() => downloadCsv('asistencia-comision.csv',
+                    ['Fecha', 'Hora', 'Estudiante', 'Legajo', 'Estado'],
+                    attendance.map((row) => [row.fecha, row.hora, row.estudiante, row.legajo, row.estado])
+                  )} disabled={attendance.length === 0} className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cobalt disabled:cursor-not-allowed disabled:opacity-40">Exportar CSV ↓</button>
+                </div>
                 {attendance.length === 0 ? (
                   <p className="text-ink/40 text-sm">Todavía no hay asistencia registrada.</p>
                 ) : (
@@ -145,7 +171,7 @@ export default function TeacherCommissionDetail() {
             )}
 
             {tab === 'stats' && (
-              <div className="bg-white rounded-xl border border-ink/10 p-5">
+              <div className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
                 {stats.length === 0 ? (
                   <p className="text-ink/40 text-sm">No hay estudiantes inscriptos.</p>
                 ) : (
@@ -166,7 +192,7 @@ export default function TeacherCommissionDetail() {
             )}
           </>
         )}
-      </div>
+      </main>
     </div>
   )
 }

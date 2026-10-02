@@ -13,6 +13,8 @@ class EnrollmentStatus(str, enum.Enum):
     APROBADA = "aprobada"
     DESAPROBADA = "desaprobada"
     LIBRE = "libre"
+    PENDIENTE_APROBACION = "pendiente_aprobacion"
+    SOLICITUD_RECHAZADA = "solicitud_rechazada"
 
 
 class Enrollment(Base):

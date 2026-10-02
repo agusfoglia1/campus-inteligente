@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.models.attendance import AttendanceStatus
+
 
 class ScheduleInfoOut(BaseModel):
     dia: str
@@ -44,3 +46,9 @@ class StudentAttendanceStatOut(BaseModel):
     total_registros: int
     presentes: int
     tardes: int
+
+
+class ManualAttendanceCreate(BaseModel):
+    student_profile_id: uuid.UUID
+    fecha: dt.date
+    estado: AttendanceStatus

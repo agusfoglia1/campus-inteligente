@@ -43,6 +43,7 @@ class ClassroomCreate(BaseModel):
 class ClassroomUpdate(BaseModel):
     codigo: Optional[str] = None
     capacidad: Optional[int] = None
+    building_id: Optional[uuid.UUID] = None
 
 
 class ClassroomOut(BaseModel):
@@ -63,6 +64,7 @@ class CareerCreate(BaseModel):
 
 class CareerUpdate(BaseModel):
     nombre: Optional[str] = None
+    codigo: Optional[str] = None
 
 
 class CareerOut(BaseModel):
@@ -83,6 +85,8 @@ class SubjectCreate(BaseModel):
 
 class SubjectUpdate(BaseModel):
     nombre: Optional[str] = None
+    codigo: Optional[str] = None
+    career_id: Optional[uuid.UUID] = None
 
 
 class SubjectOut(BaseModel):
@@ -120,6 +124,7 @@ class CommissionCreate(BaseModel):
 
 class CommissionUpdate(BaseModel):
     codigo: Optional[str] = None
+    subject_id: Optional[uuid.UUID] = None
     teacher_profile_id: Optional[uuid.UUID] = None
     estado: Optional[CommissionStatus] = None
 
@@ -145,6 +150,7 @@ class ScheduleSlotCreate(BaseModel):
 
 
 class ScheduleSlotUpdate(BaseModel):
+    commission_id: Optional[uuid.UUID] = None
     classroom_id: Optional[uuid.UUID] = None
     dia: Optional[DayOfWeek] = None
     hora_inicio: Optional[dt.time] = None

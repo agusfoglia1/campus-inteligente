@@ -5,6 +5,7 @@ import QrScreen from './pages/QrScreen'
 import MyClasses from './pages/MyClasses'
 import TeacherCommissionDetail from './pages/TeacherCommissionDetail'
 import CampusMap from './pages/CampusMap'
+import StudentProfile from './pages/StudentProfile'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/perfil" element={<ProtectedRoute allowedRoles={['student']}><StudentProfile /></ProtectedRoute>} />
       <Route
         path="/teacher/commissions/:commissionId"
         element={

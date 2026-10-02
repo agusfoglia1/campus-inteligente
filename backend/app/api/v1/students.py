@@ -1,4 +1,5 @@
 import datetime as dt
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -13,7 +14,10 @@ from app.models.user import User, UserRole
 from app.schemas.dashboard import (
     AttendanceHistoryItemOut,
     ClassInfoOut,
+    EnrollmentStatusOut,
     NextClassOut,
+    StudentEnrollmentClassOut,
+    StudentProfileOut,
     StudentDashboardOut,
 )
 from app.services.schedule import next_occurrence, today_as_dayofweek
@@ -47,7 +51,9 @@ def _get_active_schedule_slots(profile: StudentProfile, db: Session):
         .join(Building, Classroom.building_id == Building.id)
         .join(Enrollment, Enrollment.commission_id == Commission.id)
         .filter(Enrollment.student_profile_id == profile.id)
-        .filter(Enrollment.estado == EnrollmentStatus.CURSANDO)
+        .filter(Enrollment.estado.in_(
+            [EnrollmentStatus.CURSANDO, EnrollmentStatus.PENDIENTE_APROBACION, EnrollmentStatus.SOLICITUD_RECHAZADA]
+        ))
         .all()
     )
 
@@ -151,6 +157,78 @@ def get_my_subjects(
     classes = [_build_class_info(*row) for row in rows]
     classes.sort(key=lambda c: (c.dia, c.hora_inicio))
     return classes
+
+
+@router.get("/me/materias-inscriptas", response_model=list[StudentEnrollmentClassOut])
+def get_my_enrolled_subjects(
+    profile: StudentProfile = Depends(get_current_student_profile),
+    db: Session = Depends(get_db),
+):
+    """Lista los horarios de todas las inscripciones, incluidas las aprobadas."""
+    rows = (
+        db.query(Enrollment, ScheduleSlot, Commission, Subject, Classroom, Building)
+        .join(Commission, Enrollment.commission_id == Commission.id)
+        .join(Subject, Commission.subject_id == Subject.id)
+        .join(ScheduleSlot, ScheduleSlot.commission_id == Commission.id)
+        .join(Classroom, ScheduleSlot.classroom_id == Classroom.id)
+        .join(Building, Classroom.building_id == Building.id)
+        .filter(Enrollment.student_profile_id == profile.id)
+        .all()
+    )
+    classes = []
+    for enrollment, slot, commission, subject, classroom, building in rows:
+        info = _build_class_info(slot, commission, subject, classroom, building)
+        classes.append(
+            StudentEnrollmentClassOut(
+                **info.model_dump(), enrollment_id=enrollment.id, estado=enrollment.estado.value
+            )
+        )
+    classes.sort(key=lambda c: (c.dia, c.hora_inicio, c.materia))
+    return classes
+
+
+@router.post("/me/materias/{commission_id}/solicitar-aprobacion", response_model=EnrollmentStatusOut)
+def request_subject_approval(
+    commission_id: uuid.UUID,
+    profile: StudentProfile = Depends(get_current_student_profile),
+    db: Session = Depends(get_db),
+):
+    """Solicita que administración valide como aprobada una materia del estudiante."""
+    enrollment = (
+        db.query(Enrollment)
+        .filter(
+            Enrollment.student_profile_id == profile.id,
+            Enrollment.commission_id == commission_id,
+        )
+        .first()
+    )
+    if enrollment is None:
+        raise HTTPException(status_code=404, detail="No estás inscripto en esa comisión")
+    if enrollment.estado == EnrollmentStatus.APROBADA:
+        raise HTTPException(status_code=409, detail="La materia ya figura como aprobada")
+    if enrollment.estado == EnrollmentStatus.PENDIENTE_APROBACION:
+        return EnrollmentStatusOut(commission_id=commission_id, estado=enrollment.estado.value)
+    enrollment.estado = EnrollmentStatus.PENDIENTE_APROBACION
+    db.commit()
+    return EnrollmentStatusOut(commission_id=commission_id, estado=enrollment.estado.value)
+
+
+@router.get("/me/perfil", response_model=StudentProfileOut)
+def get_my_profile(
+    profile: StudentProfile = Depends(get_current_student_profile),
+    db: Session = Depends(get_db),
+):
+    enrollments = db.query(Enrollment).filter(Enrollment.student_profile_id == profile.id).all()
+    return StudentProfileOut(
+        nombre=profile.user.full_name,
+        email=profile.user.email,
+        legajo=profile.legajo,
+        carrera=profile.career.nombre,
+        anio_ingreso=profile.anio_ingreso,
+        materias_total=len(enrollments),
+        materias_aprobadas=sum(1 for item in enrollments if item.estado == EnrollmentStatus.APROBADA),
+        solicitudes_pendientes=sum(1 for item in enrollments if item.estado == EnrollmentStatus.PENDIENTE_APROBACION),
+    )
 
 
 @router.get("/me/asistencias", response_model=list[AttendanceHistoryItemOut])

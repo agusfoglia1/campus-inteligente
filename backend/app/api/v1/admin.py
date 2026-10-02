@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models.academic import Career, Classroom, Commission, Subject
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.device import Device
+from app.models.enrollment import Enrollment, EnrollmentStatus
 from app.models.profiles import StudentProfile, TeacherProfile
 from app.models.scan_log import ScanLog
 from app.models.user import User, UserRole
@@ -21,9 +22,52 @@ from app.schemas.admin import (
     StudentAdminCreate,
     StudentAdminOut,
     StudentAdminUpdate,
+    EnrollmentReviewOut,
+    EnrollmentReviewUpdate,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _enrollment_review_out(enrollment, profile, user, commission, subject):
+    return EnrollmentReviewOut(
+        id=enrollment.id, student_profile_id=profile.id, estudiante=user.full_name,
+        legajo=profile.legajo, materia=subject.nombre, materia_codigo=subject.codigo,
+        commission_id=commission.id, comision=commission.codigo, estado=enrollment.estado.value,
+    )
+
+
+@router.get("/enrollments/pending", response_model=list[EnrollmentReviewOut])
+def list_pending_enrollments(db: Session = Depends(get_db), _=Depends(require_admin)):
+    rows = (db.query(Enrollment, StudentProfile, User, Commission, Subject)
+        .join(StudentProfile, Enrollment.student_profile_id == StudentProfile.id)
+        .join(User, StudentProfile.user_id == User.id)
+        .join(Commission, Enrollment.commission_id == Commission.id)
+        .join(Subject, Commission.subject_id == Subject.id)
+        .filter(Enrollment.estado == EnrollmentStatus.PENDIENTE_APROBACION)
+        .order_by(User.full_name, Subject.nombre).all())
+    return [_enrollment_review_out(*row) for row in rows]
+
+
+@router.put("/enrollments/{enrollment_id}/review", response_model=EnrollmentReviewOut)
+def review_enrollment(enrollment_id: uuid.UUID, data: EnrollmentReviewUpdate,
+                      db: Session = Depends(get_db), _=Depends(require_admin)):
+    if data.estado not in (EnrollmentStatus.APROBADA, EnrollmentStatus.SOLICITUD_RECHAZADA):
+        raise HTTPException(status_code=422, detail="La revisión debe aprobar o rechazar la solicitud")
+    row = (db.query(Enrollment, StudentProfile, User, Commission, Subject)
+        .join(StudentProfile, Enrollment.student_profile_id == StudentProfile.id)
+        .join(User, StudentProfile.user_id == User.id)
+        .join(Commission, Enrollment.commission_id == Commission.id)
+        .join(Subject, Commission.subject_id == Subject.id)
+        .filter(Enrollment.id == enrollment_id).first())
+    if not row:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if row[0].estado != EnrollmentStatus.PENDIENTE_APROBACION:
+        raise HTTPException(status_code=409, detail="La solicitud ya fue revisada")
+    row[0].estado = data.estado
+    db.commit()
+    db.refresh(row[0])
+    return _enrollment_review_out(*row)
 
 
 def _student_out(user: User, profile: StudentProfile) -> StudentAdminOut:

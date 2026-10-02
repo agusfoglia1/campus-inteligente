@@ -17,6 +17,27 @@ class ClassInfoOut(BaseModel):
     hora_fin: dt.time
 
 
+class StudentEnrollmentClassOut(ClassInfoOut):
+    enrollment_id: uuid.UUID
+    estado: str
+
+
+class EnrollmentStatusOut(BaseModel):
+    commission_id: uuid.UUID
+    estado: str
+
+
+class StudentProfileOut(BaseModel):
+    nombre: str
+    email: str
+    legajo: str
+    carrera: str
+    anio_ingreso: Optional[int] = None
+    materias_total: int
+    materias_aprobadas: int
+    solicitudes_pendientes: int
+
+
 class NextClassOut(ClassInfoOut):
     fecha: dt.date
 

@@ -109,7 +109,10 @@ def update_classroom(
     classroom_id: uuid.UUID, data: ClassroomUpdate, db: Session = Depends(get_db), _=Depends(require_admin)
 ):
     obj = _get_or_404(db, Classroom, classroom_id, "Aula")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("building_id"):
+        _get_or_404(db, Building, changes["building_id"], "Edificio")
+    for field, value in changes.items():
         setattr(obj, field, value)
     db.commit()
     db.refresh(obj)
@@ -150,7 +153,10 @@ def update_career(
     career_id: uuid.UUID, data: CareerUpdate, db: Session = Depends(get_db), _=Depends(require_admin)
 ):
     obj = _get_or_404(db, Career, career_id, "Carrera")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("codigo") and db.query(Career).filter(Career.codigo == changes["codigo"], Career.id != obj.id).first():
+        raise HTTPException(status_code=400, detail="Ya existe una carrera con ese código")
+    for field, value in changes.items():
         setattr(obj, field, value)
     db.commit()
     db.refresh(obj)
@@ -192,7 +198,12 @@ def update_subject(
     subject_id: uuid.UUID, data: SubjectUpdate, db: Session = Depends(get_db), _=Depends(require_admin)
 ):
     obj = _get_or_404(db, Subject, subject_id, "Materia")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("career_id"):
+        _get_or_404(db, Career, changes["career_id"], "Carrera")
+    if changes.get("codigo") and db.query(Subject).filter(Subject.codigo == changes["codigo"], Subject.id != obj.id).first():
+        raise HTTPException(status_code=400, detail="Ya existe una materia con ese código")
+    for field, value in changes.items():
         setattr(obj, field, value)
     db.commit()
     db.refresh(obj)
@@ -251,7 +262,12 @@ def update_commission(
     commission_id: uuid.UUID, data: CommissionUpdate, db: Session = Depends(get_db), _=Depends(require_admin)
 ):
     obj = _get_or_404(db, Commission, commission_id, "Comisión")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("subject_id"):
+        _get_or_404(db, Subject, changes["subject_id"], "Materia")
+    if changes.get("teacher_profile_id"):
+        _get_or_404(db, TeacherProfile, changes["teacher_profile_id"], "Docente")
+    for field, value in changes.items():
         setattr(obj, field, value)
     db.commit()
     db.refresh(obj)
@@ -299,7 +315,16 @@ def update_schedule_slot(
     slot_id: uuid.UUID, data: ScheduleSlotUpdate, db: Session = Depends(get_db), _=Depends(require_admin)
 ):
     obj = _get_or_404(db, ScheduleSlot, slot_id, "Horario")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if changes.get("commission_id"):
+        _get_or_404(db, Commission, changes["commission_id"], "Comisión")
+    if changes.get("classroom_id"):
+        _get_or_404(db, Classroom, changes["classroom_id"], "Aula")
+    inicio = changes.get("hora_inicio", obj.hora_inicio)
+    fin = changes.get("hora_fin", obj.hora_fin)
+    if inicio >= fin:
+        raise HTTPException(status_code=400, detail="La hora de inicio debe ser anterior a la hora de fin")
+    for field, value in changes.items():
         setattr(obj, field, value)
     db.commit()
     db.refresh(obj)

@@ -3,6 +3,7 @@ import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import Badge, { toneForEstado } from '../components/Badge'
+import { Link } from 'react-router-dom'
 
 interface ClassInfo {
   commission_id: string
@@ -64,86 +65,102 @@ export default function StudentDashboard() {
   if (error) return <ErrorMessage message={error} onRetry={load} />
   if (!data) return null
 
+  const asistencia = data.porcentaje_asistencia ?? 0
+
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-ink/50 text-sm">Legajo {data.legajo}</p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
-        {/* Próxima clase */}
-        <div className="border-l-4 border-cobalt bg-white rounded-r-xl p-5">
-          <p className="text-cobalt text-sm font-medium mb-1">Próxima clase</p>
-          {data.proxima_clase ? (
-            <>
-              <p className="font-display text-2xl text-ink">{data.proxima_clase.materia}</p>
-              <p className="text-ink/60 mt-1">
-                {data.proxima_clase.dia} · {formatHora(data.proxima_clase.hora_inicio)}–
-                {formatHora(data.proxima_clase.hora_fin)}
-              </p>
-              <p className="text-ink/60">
-                Aula {data.proxima_clase.aula}, {data.proxima_clase.edificio}
-              </p>
-              {data.proxima_clase.docente && (
-                <p className="text-ink/40 text-sm mt-2">{data.proxima_clase.docente}</p>
-              )}
-            </>
-          ) : (
-            <p className="text-ink/40">No tenés ninguna clase próxima cargada.</p>
-          )}
-        </div>
-
-        {/* % asistencia, como número grande: es el dato más importante del dashboard */}
-        <div className="bg-ink text-paper rounded-xl p-5 flex flex-col items-center justify-center text-center">
-          <p className="font-display text-5xl">
-            {data.porcentaje_asistencia !== null ? (
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.65fr_.8fr]">
+        <section className="relative isolate overflow-hidden rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-7">
+          <div className="campus-dots absolute -right-2 -top-2 h-28 w-28 opacity-50" />
+          <div className="relative">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Tu agenda</p>
+              <span className="rounded-full bg-paper px-3 py-1 text-xs font-semibold text-ink/50">Legajo {data.legajo}</span>
+            </div>
+            {data.proxima_clase ? (
               <>
-                {data.porcentaje_asistencia}
-                <span className="text-2xl align-top">%</span>
+                <p className="text-sm font-medium capitalize text-ink/50">Próxima clase · {data.proxima_clase.dia}</p>
+                <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">{data.proxima_clase.materia}</h2>
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-lg">
+                  <div className="rounded-2xl bg-paper p-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-ink/40">Horario</p>
+                    <p className="mt-1 font-display text-lg font-extrabold text-ink">{formatHora(data.proxima_clase.hora_inicio)}–{formatHora(data.proxima_clase.hora_fin)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-cobalt-soft/70 p-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-ink/40">Aula</p>
+                    <p className="mt-1 truncate font-display text-lg font-extrabold text-ink">{data.proxima_clase.aula}</p>
+                    <p className="truncate text-xs text-ink/50">{data.proxima_clase.edificio}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  {data.proxima_clase.docente && <p className="text-sm text-ink/50">Docente · {data.proxima_clase.docente}</p>}
+                  <Link to={`/mapa?destino=${encodeURIComponent(data.proxima_clase.edificio)}`} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-bold text-cobalt transition hover:bg-cobalt-soft">Cómo llegar <span aria-hidden="true">↗</span></Link>
+                </div>
               </>
             ) : (
-              '—'
+              <div className="rounded-2xl bg-paper p-5">
+                <p className="font-display text-xl font-extrabold text-ink">Tu agenda está despejada</p>
+                <p className="mt-1 text-sm text-ink/50">No tenés próximas clases cargadas.</p>
+                <Link to="/materias" className="mt-3 inline-block text-sm font-bold text-cobalt">Ver mis materias →</Link>
+              </div>
             )}
-          </p>
-          <p className="text-paper/50 text-sm mt-1">de asistencia</p>
-        </div>
+          </div>
+        </section>
+
+        <section className="flex items-center gap-5 rounded-3xl bg-cobalt-soft/70 p-5 sm:p-7 lg:flex-col lg:justify-center lg:gap-3 lg:text-center">
+          <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-white shadow-sm sm:h-28 sm:w-28">
+            <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
+              <circle cx="50" cy="50" r="43" fill="none" stroke="#dbe9e7" strokeWidth="7" />
+              {data.porcentaje_asistencia !== null && <circle cx="50" cy="50" r="43" fill="none" stroke="#48aeb0" strokeWidth="7" strokeLinecap="round" strokeDasharray={`${Math.min(asistencia, 100) * 2.7} 270`} />}
+            </svg>
+            <span className="font-display text-2xl font-extrabold text-ink">{data.porcentaje_asistencia !== null ? `${asistencia}%` : '—'}</span>
+          </div>
+          <div>
+            <p className="font-display text-lg font-extrabold text-ink">Asistencia</p>
+            <p className="mt-1 max-w-xs text-sm leading-5 text-ink/55">Tu recorrido de presencia en las clases registradas.</p>
+          </div>
+        </section>
       </div>
 
-      <div className="bg-white rounded-xl border border-ink/10 p-5">
-        <p className="text-ink/50 text-sm font-medium mb-3">Materias de hoy</p>
-        {data.materias_del_dia.length === 0 ? (
-          <p className="text-ink/40 text-sm">No tenés clases hoy.</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-ink/5">
-            {data.materias_del_dia.map((c) => (
-              <li key={c.commission_id} className="py-2.5 flex justify-between text-sm gap-2">
-                <span className="font-medium text-ink">{c.materia}</span>
-                <span className="text-ink/50 shrink-0">
-                  {formatHora(c.hora_inicio)}–{formatHora(c.hora_fin)} · {c.aula}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <section className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Hoy en el campus</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Materias de hoy</h2></div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-soft text-lg" aria-hidden="true">◷</span>
+          </div>
+          {data.materias_del_dia.length === 0 ? (
+            <div className="rounded-2xl bg-paper p-4 text-sm text-ink/50">No tenés clases hoy. Disfrutá tu día en el campus.</div>
+          ) : (
+            <ul className="divide-y divide-ink/5">
+              {data.materias_del_dia.map((c) => (
+                <li key={c.commission_id} className="flex gap-4 py-4 first:pt-1 last:pb-1">
+                  <div className="w-16 shrink-0 border-r border-ink/10 pr-3 text-sm font-bold tabular-nums text-cobalt">{formatHora(c.hora_inicio)}</div>
+                  <div className="min-w-0 flex-1"><p className="truncate font-bold text-ink">{c.materia}</p><p className="mt-1 text-xs text-ink/50">Hasta {formatHora(c.hora_fin)} · Aula {c.aula}</p></div>
+                  <span className="hidden self-center rounded-full bg-paper px-2.5 py-1 text-xs text-ink/50 sm:inline">{c.edificio}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <div className="bg-white rounded-xl border border-ink/10 p-5">
-        <p className="text-ink/50 text-sm font-medium mb-3">Historial reciente</p>
-        {data.historial_reciente.length === 0 ? (
-          <p className="text-ink/40 text-sm">Todavía no tenés asistencias registradas.</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-ink/5">
-            {data.historial_reciente.map((h, i) => (
-              <li key={i} className="py-2.5 flex justify-between items-center text-sm gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-ink truncate">{h.materia}</p>
-                  <p className="text-ink/50">
-                    {h.fecha} · {formatHora(h.hora)} · {h.aula}
-                  </p>
-                </div>
-                <Badge tone={toneForEstado(h.estado)}>{h.estado}</Badge>
-              </li>
-            ))}
-          </ul>
-        )}
+        <section className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Registro académico</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Actividad reciente</h2></div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cobalt-soft text-lg" aria-hidden="true">↗</span>
+          </div>
+          {data.historial_reciente.length === 0 ? (
+            <div className="rounded-2xl bg-paper p-4 text-sm text-ink/50">Todavía no tenés asistencias registradas.</div>
+          ) : (
+            <ul className="divide-y divide-ink/5">
+              {data.historial_reciente.slice(0, 5).map((h, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 py-3 first:pt-1 last:pb-1">
+                  <div className="min-w-0"><p className="truncate text-sm font-bold text-ink">{h.materia}</p><p className="mt-1 text-xs text-ink/50">{h.fecha} · {formatHora(h.hora)} · {h.aula}</p></div>
+                  <Badge tone={toneForEstado(h.estado)}>{h.estado}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   )

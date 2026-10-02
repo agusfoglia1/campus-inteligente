@@ -1,4 +1,5 @@
 import uuid
+import datetime as dt
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
-from app.models.academic import Building, Classroom, Commission, ScheduleSlot, Subject
+from app.models.academic import Building, Classroom, Commission, DayOfWeek, ScheduleSlot, Subject
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.enrollment import Enrollment
 from app.models.profiles import StudentProfile, TeacherProfile
@@ -17,6 +18,7 @@ from app.schemas.teacher import (
     ScheduleInfoOut,
     StudentAttendanceStatOut,
     TeacherCommissionOut,
+    ManualAttendanceCreate,
 )
 
 router = APIRouter(prefix="/teachers", tags=["teachers"])
@@ -139,6 +141,44 @@ def get_commission_attendance(
         )
         for (a, sp, u) in rows
     ]
+
+
+@router.post("/me/commissions/{commission_id}/attendance/manual", response_model=CommissionAttendanceRecordOut, status_code=201)
+def create_manual_attendance(commission_id: uuid.UUID, data: ManualAttendanceCreate,
+    teacher: TeacherProfile = Depends(get_current_teacher_profile), db: Session = Depends(get_db)):
+    _get_owned_commission(commission_id, teacher, db)
+    if data.fecha > dt.date.today():
+        raise HTTPException(status_code=422, detail="No se puede registrar asistencia para una fecha futura")
+    enrollment = db.query(Enrollment).filter(
+        Enrollment.commission_id == commission_id,
+        Enrollment.student_profile_id == data.student_profile_id,
+        Enrollment.estado.in_(["CURSANDO", "PENDIENTE_APROBACION", "SOLICITUD_RECHAZADA"]),
+    ).first()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="El estudiante no está inscripto en esta comisión")
+    day_names = [DayOfWeek.LUNES, DayOfWeek.MARTES, DayOfWeek.MIERCOLES,
+        DayOfWeek.JUEVES, DayOfWeek.VIERNES, DayOfWeek.SABADO, None]
+    weekday = day_names[data.fecha.weekday()]
+    slots = db.query(ScheduleSlot).filter(ScheduleSlot.commission_id == commission_id,
+        ScheduleSlot.dia == weekday).all() if weekday else []
+    if not slots:
+        raise HTTPException(status_code=422, detail="La comisión no tiene clase programada ese día")
+    if db.query(Attendance).filter(Attendance.student_profile_id == data.student_profile_id,
+        Attendance.commission_id == commission_id, Attendance.fecha == data.fecha).first():
+        raise HTTPException(status_code=409, detail="Ya existe asistencia para ese estudiante y fecha")
+    profile = db.query(StudentProfile).filter(StudentProfile.id == data.student_profile_id).first()
+    user = db.query(User).filter(User.id == profile.user_id).first()
+    record = Attendance(student_profile_id=profile.id, commission_id=commission_id,
+        fecha=data.fecha, hora=dt.datetime.now().time().replace(microsecond=0),
+        estado=data.estado, classroom_id=slots[0].classroom_id)
+    db.add(record)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="No se pudo registrar: ya existe una asistencia para esa fecha")
+    return CommissionAttendanceRecordOut(fecha=record.fecha, hora=record.hora,
+        estudiante=user.full_name, legajo=profile.legajo, estado=record.estado.value)
 
 
 @router.get("/me/commissions/{commission_id}/stats", response_model=list[StudentAttendanceStatOut])

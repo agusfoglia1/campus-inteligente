@@ -3,6 +3,8 @@ import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import Badge, { toneForEstado } from '../components/Badge'
+import AcademicManagementTab from './AcademicManagementTab'
+import { downloadCsv } from '../lib/exportCsv'
 
 // ---------- Tipos ----------
 interface Stats {
@@ -61,11 +63,13 @@ interface ScanLogAdmin {
   result: string
 }
 
-type Tab = 'resumen' | 'estudiantes' | 'dispositivos' | 'asistencias' | 'actividad'
+type Tab = 'resumen' | 'estudiantes' | 'academico' | 'aprobaciones' | 'dispositivos' | 'asistencias' | 'actividad'
 
 const TABS: [Tab, string][] = [
   ['resumen', 'Resumen'],
   ['estudiantes', 'Estudiantes'],
+  ['academico', 'Gestión académica'],
+  ['aprobaciones', 'Aprobaciones'],
   ['dispositivos', 'Dispositivos'],
   ['asistencias', 'Asistencias'],
   ['actividad', 'Actividad'],
@@ -81,8 +85,8 @@ export default function AdminDashboard() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 min-w-fit px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === key ? 'bg-ink text-paper' : 'text-ink/60 hover:bg-paper'
+            className={`flex-1 min-w-fit px-3 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+              tab === key ? 'bg-ink text-white shadow-sm' : 'text-ink/60 hover:bg-cobalt-soft hover:text-ink'
             }`}
           >
             {label}
@@ -92,11 +96,32 @@ export default function AdminDashboard() {
 
       {tab === 'resumen' && <ResumenTab />}
       {tab === 'estudiantes' && <EstudiantesTab />}
+      {tab === 'academico' && <AcademicManagementTab />}
+      {tab === 'aprobaciones' && <AprobacionesTab />}
       {tab === 'dispositivos' && <DispositivosTab />}
       {tab === 'asistencias' && <AsistenciasTab />}
       {tab === 'actividad' && <ActividadTab />}
     </div>
   )
+}
+
+function AprobacionesTab() {
+  const [items, setItems] = useState<{id:string; estudiante:string; legajo:string; materia:string; materia_codigo:string; comision:string}[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState<string | null>(null)
+  const load = useCallback(() => api.get('/admin/enrollments/pending').then(r => setItems(r.data)).catch(e => setError(getErrorMessage(e, 'No se pudieron cargar las solicitudes.'))), [])
+  useEffect(() => { load() }, [load])
+  async function review(id: string, estado: 'aprobada' | 'solicitud_rechazada') {
+    setBusy(id); setError('')
+    try { await api.put(`/admin/enrollments/${id}/review`, { estado }); await load() }
+    catch (e) { setError(getErrorMessage(e, 'No se pudo guardar la revisión.')) }
+    finally { setBusy(null) }
+  }
+  return <section className="flex flex-col gap-4"><div><h2 className="font-display text-xl font-extrabold text-ink">Solicitudes de aprobación</h2><p className="mt-1 text-sm text-ink/50">Revisá las materias que los estudiantes informan como aprobadas.</p></div>
+    {error && <ErrorMessage message={error} onRetry={load} />}
+    {!error && items.length === 0 && <div className="rounded-2xl border border-ink/10 bg-white p-6 text-sm text-ink/55">No hay solicitudes pendientes.</div>}
+    <ul className="flex flex-col gap-3">{items.map(i => <li key={i.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink/10 bg-white p-4"><div><p className="font-bold text-ink">{i.materia} <span className="text-xs text-ink/45">{i.materia_codigo}</span></p><p className="mt-1 text-sm text-ink/55">{i.estudiante} · Legajo {i.legajo} · Comisión {i.comision}</p></div><div className="flex gap-2"><button disabled={busy===i.id} onClick={()=>review(i.id,'solicitud_rechazada')} className="rounded-full border border-ink/15 px-3 py-2 text-xs font-bold text-ink/65 disabled:opacity-50">Observar</button><button disabled={busy===i.id} onClick={()=>review(i.id,'aprobada')} className="rounded-full bg-cobalt px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Aprobar</button></div></li>)}</ul>
+  </section>
 }
 
 // ---------- Resumen ----------
@@ -136,14 +161,17 @@ function ResumenTab() {
   ]
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      {cards.map(([label, value]) => (
-        <div key={label} className="bg-ink text-paper rounded-xl p-4 text-center">
-          <p className="font-display text-3xl">{value}</p>
-          <p className="text-paper/50 text-xs mt-1">{label}</p>
-        </div>
-      ))}
-    </div>
+    <section>
+      <div className="mb-4"><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Campus Inteligente</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Actividad general</h2></div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {cards.map(([label, value], index) => (
+          <div key={label} className={`rounded-2xl border border-ink/10 border-t-[3px] bg-white p-4 shadow-sm sm:rounded-3xl sm:p-5 ${index % 3 === 1 ? 'border-t-amber' : 'border-t-cobalt'}`}>
+            <p className="font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">{value}</p>
+            <p className="mt-2 text-xs font-semibold leading-4 text-ink/50 sm:text-sm">{label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -396,8 +424,14 @@ function AsistenciasTab() {
   if (error) return <ErrorMessage message={error} onRetry={load} />
 
   return (
-    <div className="bg-white rounded-xl border border-ink/10 p-5">
-      <h2 className="font-display text-xl text-ink mb-3">Asistencias (todo el sistema)</h2>
+    <div className="rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div><p className="text-xs font-bold uppercase tracking-[.15em] text-cobalt">Registro académico</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Asistencias del campus</h2></div>
+        <button type="button" onClick={() => downloadCsv('asistencias-campus.csv',
+          ['Fecha', 'Hora', 'Estudiante', 'Legajo', 'Materia', 'Comisión', 'Aula', 'Estado'],
+          rows.map((row) => [row.fecha, row.hora, row.estudiante, row.legajo, row.materia, row.comision, row.aula, row.estado])
+        )} disabled={rows.length === 0} className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white transition hover:bg-cobalt disabled:cursor-not-allowed disabled:opacity-40">Exportar CSV ↓</button>
+      </div>
       {rows.length === 0 ? (
         <p className="text-ink/40 text-sm">Todavía no hay asistencias registradas.</p>
       ) : (
