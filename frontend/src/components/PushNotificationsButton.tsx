@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 
-function decodeBase64Url(value: string): Uint8Array {
+function decodeBase64Url(value: string): ArrayBuffer {
   const padded = (value + '='.repeat((4 - value.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')
   const raw = window.atob(padded)
-  return Uint8Array.from(raw, (character) => character.charCodeAt(0))
+  const buffer = new ArrayBuffer(raw.length)
+  const bytes = new Uint8Array(buffer)
+  for (let index = 0; index < raw.length; index += 1) bytes[index] = raw.charCodeAt(index)
+  return buffer
 }
 
 export default function PushNotificationsButton() {

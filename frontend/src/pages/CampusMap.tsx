@@ -103,6 +103,8 @@ export default function CampusMap() {
   const [trackingLocation, setTrackingLocation] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
+  const [routeOrigin, setRouteOrigin] = useState('__current_location__')
+  const [routeDestination, setRouteDestination] = useState('')
   const watchId = useRef<number | null>(null)
 
   useEffect(() => () => {
@@ -193,8 +195,23 @@ export default function CampusMap() {
   const focusBuilding = (building: MapBuilding) => {
     if (building.latitude !== null && building.longitude !== null) setFocusPosition([building.latitude, building.longitude])
   }
-  const directionsUrl = (latitude: number, longitude: number) =>
-    `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=walking`
+  const directionsUrl = (destination: [number, number], origin?: [number, number]) => {
+    const params = new URLSearchParams({
+      api: '1',
+      destination: `${destination[0]},${destination[1]}`,
+      travelmode: 'walking',
+    })
+    if (origin) params.set('origin', `${origin[0]},${origin[1]}`)
+    return `https://www.google.com/maps/dir/?${params.toString()}`
+  }
+  const routeDestinationBuilding = buildingsWithCoords.find((building) => building.id === routeDestination)
+  const routeOriginBuilding = buildingsWithCoords.find((building) => building.id === routeOrigin)
+  const routeOriginCoords = routeOrigin === '__current_location__'
+    ? userPosition?.coords
+    : routeOriginBuilding && routeOriginBuilding.latitude !== null && routeOriginBuilding.longitude !== null
+      ? [routeOriginBuilding.latitude, routeOriginBuilding.longitude] as [number, number]
+      : undefined
+  const sameRouteEndpoints = routeOriginBuilding?.id === routeDestinationBuilding?.id
 
   const allPoints: [number, number][] = [
     ...buildingsWithCoords.map((b) => [b.latitude as number, b.longitude as number] as [number, number]),
@@ -235,6 +252,43 @@ export default function CampusMap() {
               {[...new Set(data.locations.map((location) => location.tipo))].map((type) => <option key={type} value={type}>{type.replace('_', ' ')}</option>)}
             </select>
           </label>
+        </section>}
+
+        {!loading && !error && data && <section className="rounded-3xl border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase tracking-[.15em] text-cobalt">Recorrido peatonal</p>
+            <h2 className="mt-1 font-display text-lg font-extrabold text-ink">¿Cómo llegar?</h2>
+            <p className="mt-1 text-sm text-ink/50">Elegí el punto de partida y el edificio al que querés ir.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink/45">Desde</span>
+              <select value={routeOrigin} onChange={(event) => setRouteOrigin(event.target.value)} className="w-full rounded-xl border border-ink/10 bg-paper px-4 py-3 text-sm text-ink outline-none focus:border-cobalt">
+                <option value="__current_location__">Mi ubicación</option>
+                {buildingsWithCoords.map((building) => <option key={building.id} value={building.id}>{building.nombre}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink/45">Hasta</span>
+              <select value={routeDestination} onChange={(event) => setRouteDestination(event.target.value)} className="w-full rounded-xl border border-ink/10 bg-paper px-4 py-3 text-sm text-ink outline-none focus:border-cobalt">
+                <option value="">Elegí un edificio</option>
+                {buildingsWithCoords.map((building) => <option key={building.id} value={building.id}>{building.nombre}</option>)}
+              </select>
+            </label>
+            {routeDestinationBuilding && !sameRouteEndpoints ? (
+              <a href={directionsUrl(
+                [routeDestinationBuilding.latitude as number, routeDestinationBuilding.longitude as number],
+                routeOriginCoords,
+              )} target="_blank" rel="noreferrer" className="inline-flex justify-center rounded-full bg-cobalt px-5 py-3 text-sm font-bold text-white transition hover:bg-ink">
+                Iniciar recorrido ↗
+              </a>
+            ) : (
+              <button type="button" disabled className="cursor-not-allowed rounded-full bg-ink/10 px-5 py-3 text-sm font-bold text-ink/35">
+                {sameRouteEndpoints ? 'Elegí otro destino' : 'Iniciar recorrido'}
+              </button>
+            )}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-ink/45">La guía peatonal se abre en Google Maps. Si elegís “Mi ubicación”, el teléfono puede usar su GPS como punto de partida.</p>
         </section>}
 
         {loading && <Spinner label="Cargando el mapa..." />}
@@ -293,7 +347,7 @@ export default function CampusMap() {
                     {visibleLocations.map((loc) => <li key={loc.id} className="flex items-start gap-3 py-3 first:pt-1">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-paper text-base">{TIPO_EMOJI[loc.tipo] ?? '📍'}</span>
                       <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-ink">{loc.nombre}</p><p className="mt-0.5 text-xs capitalize text-ink/45">{loc.tipo.replace('_', ' ')}</p><button onClick={() => setFocusPosition([loc.latitude, loc.longitude])} className="mt-1 text-xs font-bold text-cobalt hover:underline">Ver en el mapa</button></div>
-                      <a href={directionsUrl(loc.latitude, loc.longitude)} target="_blank" rel="noreferrer" className="shrink-0 self-center text-xs font-bold text-cobalt hover:underline">Cómo llegar ↗</a>
+                      <a href={directionsUrl([loc.latitude, loc.longitude], userPosition?.coords)} target="_blank" rel="noreferrer" className="shrink-0 self-center text-xs font-bold text-cobalt hover:underline">Cómo llegar ↗</a>
                     </li>)}
                   </ul>
                 )}
@@ -304,7 +358,7 @@ export default function CampusMap() {
                   {visibleBuildings.map((building) => <li key={building.id} className="flex items-center justify-between gap-3 py-3 first:pt-1">
                     <div className="min-w-0"><p className="truncate text-sm font-bold">{building.nombre}</p><p className="text-xs text-white/45">{building.classrooms.length} aulas</p></div>
                     <div className="flex items-center gap-2">
-                      {building.latitude !== null && building.longitude !== null && <><button onClick={() => focusBuilding(building)} className="text-xs font-bold text-[#8bd2cf] hover:underline">Ver</button><a href={directionsUrl(building.latitude, building.longitude)} target="_blank" rel="noreferrer" className="text-xs font-bold text-white hover:underline">Cómo llegar ↗</a></>}
+                      {building.latitude !== null && building.longitude !== null && <><button onClick={() => focusBuilding(building)} className="text-xs font-bold text-[#8bd2cf] hover:underline">Ver</button><a href={directionsUrl([building.latitude, building.longitude], userPosition?.coords)} target="_blank" rel="noreferrer" className="text-xs font-bold text-white hover:underline">Cómo llegar ↗</a></>}
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${building.latitude !== null && building.longitude !== null ? 'bg-[#8bd2cf]' : 'bg-amber'}`} title={building.latitude !== null && building.longitude !== null ? 'Ubicado en el mapa' : 'Sin coordenadas'} />
                     </div>
                   </li>)}
