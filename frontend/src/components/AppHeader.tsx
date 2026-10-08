@@ -56,7 +56,6 @@ export default function AppHeader({ backTo }: Props) {
           {user?.role === 'student' && <Link to="/materias" aria-current={pathname === '/materias' ? 'page' : undefined} className={navLink(pathname === '/materias')}>Mis materias</Link>}
           {user?.role === 'student' && <Link to="/perfil" aria-current={pathname === '/perfil' ? 'page' : undefined} className={navLink(pathname === '/perfil')}>Mi perfil</Link>}
           {user?.role === 'student' && <Link to="/qr" aria-current={pathname === '/qr' ? 'page' : undefined} className={navLink(pathname === '/qr')}>Mi QR</Link>}
-          <Link to="/oferta-academica" aria-current={pathname === '/oferta-academica' ? 'page' : undefined} className={navLink(pathname === '/oferta-academica')}>Oferta académica</Link>
           <Link to="/mapa" aria-current={pathname === '/mapa' ? 'page' : undefined} className={navLink(pathname === '/mapa')}>Mapa del campus</Link>
         </nav>
 
@@ -79,7 +78,6 @@ export default function AppHeader({ backTo }: Props) {
           { to: '/dashboard', label: 'Inicio', icon: '⌂' },
           { to: '/qr', label: 'Mi QR', icon: '▦', qr: true },
           { to: '/materias', label: 'Materias', icon: '▤' },
-          { to: '/oferta-academica', label: 'Carreras', icon: '⌕' },
           { to: '/mapa', label: 'Mapa', icon: '⌖' },
         ].map((item) => <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={`mobile-bottom-link ${item.qr ? 'mobile-bottom-link-qr' : ''}`}>
           <span aria-hidden="true">{item.icon}</span><span>{item.label}</span>

@@ -126,9 +126,8 @@ se muestran mediante `ToastProvider`; `useToast` se importa desde
   recorridos deben conservar contraste y no ocultar controles del mapa.
 - **Administración:** priorizar tablas y formularios claros, filtros visibles,
   confirmación de acciones y estados comprensibles.
-- **Oferta académica:** permitir encontrar carreras y materias con rapidez,
-  vincular los planes con su fuente oficial y distinguir los datos de referencia
-  de las comisiones y horarios que administra el campus.
+- **Carreras y materias:** administrar los planes de estudio junto con las
+  comisiones y horarios que ofrece el campus.
 
 ## Responsive y accesibilidad
 

@@ -1,11 +1,14 @@
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AppHeader from '../components/AppHeader'
-import StudentDashboard from './StudentDashboard'
-import TeacherDashboard from './TeacherDashboard'
-import AdminDashboard from './AdminDashboard'
 import AnnouncementsPanel from '../components/AnnouncementsPanel'
 import PushNotificationsButton from '../components/PushNotificationsButton'
+import Spinner from '../components/Spinner'
+
+const StudentDashboard = lazy(() => import('./StudentDashboard'))
+const TeacherDashboard = lazy(() => import('./TeacherDashboard'))
+const AdminDashboard = lazy(() => import('./AdminDashboard'))
 
 function CampusIllustration() {
   return (
@@ -74,16 +77,17 @@ export default function Dashboard() {
           {user?.role === 'student' && <QuickLink to="/qr" marker="QR" title="Mi código de acceso" detail="Mostralo para registrar tu ingreso a clase." />}
           {user?.role === 'student' && <QuickLink to="/materias" marker="01" title="Mis materias" detail="Consultá tus comisiones y horarios." />}
           {user?.role === 'student' && <QuickLink to="/perfil" marker="02" title="Mi perfil académico" detail="Revisá tus datos y avance académico." />}
-          <QuickLink to="/oferta-academica" marker="Aa" title="Carreras y materias" detail="Explorá los planes de estudio publicados por UNRaf." />
           <QuickLink to="/mapa" marker="⌖" title="Mapa del campus" detail="Encontrá edificios y espacios universitarios." />
         </section>
 
         <AnnouncementsPanel />
         <PushNotificationsButton />
 
-        {user?.role === 'student' && <StudentDashboard />}
-        {user?.role === 'teacher' && <TeacherDashboard />}
-        {user?.role === 'admin' && <AdminDashboard />}
+        <Suspense fallback={<Spinner label="Cargando tu espacio…" />}>
+          {user?.role === 'student' && <StudentDashboard />}
+          {user?.role === 'teacher' && <TeacherDashboard />}
+          {user?.role === 'admin' && <AdminDashboard />}
+        </Suspense>
       </main>
       <footer className="mt-10 border-t border-ink/10 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-ink/45 sm:px-6 lg:px-8">

@@ -1,12 +1,4 @@
-export interface AcademicProgram {
-  name: string
-  code: string
-  source: string
-  subjects: string[]
-}
-
-// Catálogo informativo basado en los planes publicados por la UNRaf. Revisado el 8/10/2026.
-export const unrafCurricula: AcademicProgram[] = [
+[
   {
     "name": "Licenciatura en Gestión de la Tecnología aplicada a Logística",
     "code": "UNRAF-LGTAL",

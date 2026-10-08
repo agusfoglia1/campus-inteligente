@@ -4,7 +4,6 @@ import ErrorMessage from '../components/ErrorMessage'
 import Spinner from '../components/Spinner'
 import { Button, Drawer, EmptyState, Tabs } from '../components/ui'
 import { useToast } from '../components/toast'
-import { unrafCurricula } from '../data/unrafCurricula'
 
 type Resource = 'buildings' | 'classrooms' | 'careers' | 'subjects' | 'commissions' | 'schedule-slots'
 type Item = { id: string; [key: string]: unknown }
@@ -56,8 +55,6 @@ export default function AcademicManagementTab() {
   const [form, setForm] = useState<Record<string, string>>({})
   const [query, setQuery] = useState('')
   const [sortAscending, setSortAscending] = useState(true)
-  const [importingCatalog, setImportingCatalog] = useState(false)
-  const [importProgress, setImportProgress] = useState('')
   const notify = useToast()
 
   const buildings = data.buildings as Building[]
@@ -66,76 +63,6 @@ export default function AcademicManagementTab() {
   const subjects = data.subjects as Subject[]
   const commissions = data.commissions as Commission[]
   const slots = data['schedule-slots'] as ScheduleSlot[]
-
-  function normalizedName(value: string) {
-    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').replace(/[^a-z0-9]+/g, ' ').trim()
-  }
-
-  async function importOfficialCatalog() {
-    const subjectTotal = unrafCurricula.reduce((total, program) => total + program.subjects.length, 0)
-    if (!window.confirm(`Se agregarán las carreras y materias oficiales que falten en la base académica (hasta ${unrafCurricula.length} carreras y ${subjectTotal} materias). Los registros existentes no se modificarán. ¿Continuar?`)) return
-    setImportingCatalog(true)
-    setImportProgress('Preparando catálogo…')
-    let createdCareers = 0
-    let createdSubjects = 0
-    let skippedSubjects = 0
-    const failures: string[] = []
-    let knownCareers = [...careers]
-    let knownSubjects = [...subjects]
-    try {
-      for (const [programIndex, program] of unrafCurricula.entries()) {
-        setImportProgress(`Carrera ${programIndex + 1} de ${unrafCurricula.length}: ${program.name}`)
-        let career = knownCareers.find((item) => normalizedName(item.nombre) === normalizedName(program.name))
-        if (!career) {
-          const usedCodes = new Set(knownCareers.map((item) => item.codigo.toLocaleUpperCase()))
-          let code = program.code
-          let suffix = 2
-          while (usedCodes.has(code.toLocaleUpperCase())) code = `${program.code}-${suffix++}`
-          try {
-            const response = await api.post<Career>('/academic/careers', { nombre: program.name, codigo: code })
-            career = response.data
-            knownCareers.push(career)
-            createdCareers += 1
-          } catch (err) {
-            failures.push(`${program.name}: ${getErrorMessage(err, 'no se pudo crear la carrera')}`)
-            continue
-          }
-        }
-
-        const missing = program.subjects.flatMap((name, index) => {
-          const exists = knownSubjects.some((item) => item.career_id === career?.id && normalizedName(item.nombre) === normalizedName(name))
-          if (exists) { skippedSubjects += 1; return [] }
-          const baseCode = `${program.code}-M${String(index + 1).padStart(3, '0')}`
-          const usedCodes = new Set(knownSubjects.map((item) => item.codigo.toLocaleUpperCase()))
-          let code = baseCode
-          let suffix = 2
-          while (usedCodes.has(code.toLocaleUpperCase())) code = `${baseCode}-${suffix++}`
-          return [{ nombre: name, codigo: code, career_id: career!.id }]
-        })
-        for (let offset = 0; offset < missing.length; offset += 8) {
-          const batch = missing.slice(offset, offset + 8)
-          const results = await Promise.allSettled(batch.map((body) => api.post<Subject>('/academic/subjects', body)))
-          results.forEach((result, batchIndex) => {
-            if (result.status === 'fulfilled') {
-              knownSubjects.push(result.value.data)
-              createdSubjects += 1
-            } else {
-              failures.push(`${program.name} · ${batch[batchIndex].nombre}: ${getErrorMessage(result.reason, 'no se pudo crear la materia')}`)
-            }
-          })
-        }
-      }
-      await load()
-      notify(`Catálogo cargado: ${createdCareers} carreras y ${createdSubjects} materias nuevas`)
-      setImportProgress(`Listo: ${createdCareers} carreras y ${createdSubjects} materias agregadas; ${skippedSubjects} materias ya existían.${failures.length ? ` ${failures.length} registros necesitan revisión.` : ''}`)
-      if (failures.length) setError(`Algunos registros no se pudieron importar: ${failures.slice(0, 4).join(' · ')}${failures.length > 4 ? ` · y ${failures.length - 4} más` : ''}`)
-    } catch (err) {
-      setImportProgress('')
-      setError(getErrorMessage(err, 'No se pudo completar la importación. Los registros ya creados permanecen guardados.'))
-    } finally {
-      setImportingCatalog(false)
-    }
-  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -312,12 +239,9 @@ export default function AcademicManagementTab() {
       <div className="flex flex-wrap justify-between items-center gap-2">
         <h3 className="font-display text-lg text-ink">{RESOURCES.find((item) => item.id === resource)?.label}</h3>
         <div className="flex flex-wrap gap-2">
-          {(resource === 'careers' || resource === 'subjects') && <Button variant="secondary" disabled={importingCatalog} onClick={importOfficialCatalog}>{importingCatalog ? 'Cargando catálogo…' : 'Cargar carreras y materias UNRaf'}</Button>}
-          <Button variant={showForm ? 'secondary' : 'primary'} disabled={importingCatalog} onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? 'Cerrar formulario' : 'Nuevo registro'}</Button>
+          <Button variant={showForm ? 'secondary' : 'primary'} onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? 'Cerrar formulario' : 'Nuevo registro'}</Button>
         </div>
       </div>
-
-      {importProgress && <p role="status" aria-live="polite" className="rounded-xl bg-cobalt-soft px-4 py-3 text-sm text-ink">{importProgress}</p>}
 
       <Drawer open={showForm} title={editing ? 'Editar registro' : 'Nuevo registro'} onClose={() => setShowForm(false)}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

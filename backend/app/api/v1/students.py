@@ -2,14 +2,15 @@ import datetime as dt
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import case, func
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
 from app.models.academic import Building, Classroom, Commission, ScheduleSlot, Subject
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.enrollment import Enrollment, EnrollmentStatus
-from app.models.profiles import StudentProfile
+from app.models.profiles import StudentProfile, TeacherProfile
 from app.models.user import User, UserRole
 from app.schemas.dashboard import (
     AttendanceHistoryItemOut,
@@ -50,6 +51,7 @@ def _get_active_schedule_slots(profile: StudentProfile, db: Session):
         .join(Classroom, ScheduleSlot.classroom_id == Classroom.id)
         .join(Building, Classroom.building_id == Building.id)
         .join(Enrollment, Enrollment.commission_id == Commission.id)
+        .options(joinedload(Commission.teacher_profile).joinedload(TeacherProfile.user))
         .filter(Enrollment.student_profile_id == profile.id)
         .filter(Enrollment.estado.in_(
             [EnrollmentStatus.CURSANDO, EnrollmentStatus.PENDIENTE_APROBACION, EnrollmentStatus.SOLICITUD_RECHAZADA]
@@ -123,18 +125,13 @@ def get_dashboard(
     ]
 
     # Porcentaje de asistencia (sobre el total de registros que existan hasta ahora)
-    total = db.query(Attendance).filter(Attendance.student_profile_id == profile.id).count()
+    attendance_total, attendance_present = db.query(
+        func.count(Attendance.id),
+        func.sum(case((Attendance.estado.in_([AttendanceStatus.PRESENTE, AttendanceStatus.TARDE]), 1), else_=0)),
+    ).filter(Attendance.student_profile_id == profile.id).one()
     porcentaje_asistencia = None
-    if total > 0:
-        presentes = (
-            db.query(Attendance)
-            .filter(
-                Attendance.student_profile_id == profile.id,
-                Attendance.estado.in_([AttendanceStatus.PRESENTE, AttendanceStatus.TARDE]),
-            )
-            .count()
-        )
-        porcentaje_asistencia = round((presentes / total) * 100, 1)
+    if attendance_total > 0:
+        porcentaje_asistencia = round(((attendance_present or 0) / attendance_total) * 100, 1)
 
     return StudentDashboardOut(
         nombre=profile.user.full_name,

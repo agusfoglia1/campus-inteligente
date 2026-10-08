@@ -1,81 +1,152 @@
-"""Script de prueba: crea datos de ejemplo para verificar el modelo completo.
+"""Carga idempotentemente el catálogo UNRaf y un escenario mínimo de prueba.
 
-Uso:
-    python -m app.db.seed
-
-Requiere que ya hayas corrido las migraciones (alembic upgrade head) y que
-exista al menos un usuario estudiante registrado (via /api/v1/auth/register)
-para vincularlo a un StudentProfile.
+Uso: python -m app.db.seed
+Requiere que las migraciones estén aplicadas y al menos un usuario estudiante.
 """
 import datetime
+import json
+import re
+import unicodedata
+from pathlib import Path
 
 from app.db.session import SessionLocal
-from app.models.academic import Building, Classroom, Career, Subject, Commission, ScheduleSlot, DayOfWeek
-from app.models.profiles import StudentProfile
+from app.models.academic import Building, Career, Classroom, Commission, DayOfWeek, ScheduleSlot, Subject
 from app.models.enrollment import Enrollment
+from app.models.profiles import StudentProfile
 from app.models.user import User, UserRole
+
+
+def _key(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(char for char in value if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+
+def _ensure_catalog(db):
+    catalog_path = Path(__file__).resolve().parents[1] / "data" / "unraf_curricula.json"
+    programs = json.loads(catalog_path.read_text(encoding="utf-8"))
+    careers = db.query(Career).all()
+    by_name = {_key(row.nombre): row for row in careers}
+    used_codes = {row.codigo.casefold() for row in careers}
+    career_by_program = {}
+
+    for program in programs:
+        career = by_name.get(_key(program["name"]))
+        if not career:
+            code = program["code"]
+            suffix = 2
+            while code.casefold() in used_codes:
+                code = f"{program['code']}-{suffix}"
+                suffix += 1
+            career = Career(nombre=program["name"], codigo=code)
+            db.add(career)
+            db.flush()
+            by_name[_key(career.nombre)] = career
+            used_codes.add(code.casefold())
+        career_by_program[program["name"]] = career
+
+    subjects = db.query(Subject).all()
+    by_subject_name = {(row.career_id, _key(row.nombre)) for row in subjects}
+    used_subject_codes = {row.codigo.casefold() for row in subjects}
+    for program in programs:
+        career = career_by_program[program["name"]]
+        for index, name in enumerate(program["subjects"], start=1):
+            if (career.id, _key(name)) in by_subject_name:
+                continue
+            base_code = f"{program['code']}-M{index:03d}"
+            code = base_code
+            suffix = 2
+            while code.casefold() in used_subject_codes:
+                code = f"{base_code}-{suffix}"
+                suffix += 1
+            db.add(Subject(nombre=name, codigo=code, career_id=career.id))
+            by_subject_name.add((career.id, _key(name)))
+            used_subject_codes.add(code.casefold())
+    db.flush()
+    return career_by_program
 
 
 def run():
     db = SessionLocal()
     try:
-        # 1. Edificio y aula
-        edificio = Building(nombre="Ingenieria", ubicacion="Campus Norte")
-        db.add(edificio)
-        db.flush()
-
-        aula = Classroom(codigo="A-204", building_id=edificio.id, capacidad=40)
-        db.add(aula)
-
-        # 2. Carrera y materia
-        carrera = Career(nombre="Ingenieria en Sistemas", codigo="ISI")
-        db.add(carrera)
-        db.flush()
-
-        materia = Subject(nombre="Analisis Matematico II", codigo="AM2", career_id=carrera.id)
-        db.add(materia)
-        db.flush()
-
-        # 3. Comision y horario
-        comision = Commission(codigo="Comision 1", subject_id=materia.id)
-        db.add(comision)
-        db.flush()
-
-        horario = ScheduleSlot(
-            commission_id=comision.id,
-            classroom_id=aula.id,
-            dia=DayOfWeek.VIERNES,
-            hora_inicio=datetime.time(14, 0),
-            hora_fin=datetime.time(16, 0),
+        careers = _ensure_catalog(db)
+        carrera = careers["Ingeniería en Computación"]
+        materia = next(
+            row for row in db.query(Subject).filter(Subject.career_id == carrera.id).all()
+            if _key(row.nombre) == _key("Análisis Matemático II")
         )
-        db.add(horario)
 
-        # 4. Vincular un estudiante existente (el primero que encuentre con role=student)
-        user_estudiante = db.query(User).filter(User.role == UserRole.STUDENT).first()
-        if user_estudiante:
-            existing_profile = (
-                db.query(StudentProfile).filter(StudentProfile.user_id == user_estudiante.id).first()
-            )
-            if not existing_profile:
-                perfil = StudentProfile(
-                    user_id=user_estudiante.id,
-                    legajo="LEG-0001",
+        edificio = next((row for row in db.query(Building).all() if _key(row.nombre) == _key("Ingeniería")), None)
+        if not edificio:
+            edificio = Building(nombre="Ingeniería", ubicacion="Campus Norte")
+            db.add(edificio)
+            db.flush()
+        aula = db.query(Classroom).filter(Classroom.building_id == edificio.id, Classroom.codigo == "A-204").first()
+        if not aula:
+            aula = Classroom(codigo="A-204", building_id=edificio.id, capacidad=40)
+            db.add(aula)
+            db.flush()
+
+        comision = db.query(Commission).filter(
+            Commission.subject_id == materia.id, Commission.codigo == "Comisión de prueba"
+        ).first()
+        if not comision:
+            comision = Commission(codigo="Comisión de prueba", subject_id=materia.id)
+            db.add(comision)
+            db.flush()
+
+        horario = db.query(ScheduleSlot).filter(
+            ScheduleSlot.commission_id == comision.id,
+            ScheduleSlot.classroom_id == aula.id,
+            ScheduleSlot.dia == DayOfWeek.VIERNES,
+            ScheduleSlot.hora_inicio == datetime.time(14, 0),
+        ).first()
+        if not horario:
+            db.add(ScheduleSlot(
+                commission_id=comision.id,
+                classroom_id=aula.id,
+                dia=DayOfWeek.VIERNES,
+                hora_inicio=datetime.time(14, 0),
+                hora_fin=datetime.time(16, 0),
+            ))
+
+        user = db.query(User).filter(User.role == UserRole.STUDENT).order_by(User.email).first()
+        if user:
+            profile = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+            if not profile:
+                base_legajo = "LEG-DEMO-0001"
+                legajo = base_legajo
+                suffix = 2
+                while db.query(StudentProfile).filter(StudentProfile.legajo == legajo).first():
+                    legajo = f"{base_legajo}-{suffix}"
+                    suffix += 1
+                profile = StudentProfile(
+                    user_id=user.id,
+                    legajo=legajo,
                     career_id=carrera.id,
                     anio_ingreso=2024,
                 )
-                db.add(perfil)
+                db.add(profile)
                 db.flush()
-
-                inscripcion = Enrollment(student_profile_id=perfil.id, commission_id=comision.id)
-                db.add(inscripcion)
-                print(f"Estudiante '{user_estudiante.email}' inscripto en {materia.nombre} / {comision.codigo}")
             else:
-                print(f"El estudiante '{user_estudiante.email}' ya tenia un perfil, no se duplica.")
+                current_career = db.query(Career).filter(Career.id == profile.career_id).first()
+                if current_career and current_career.codigo == "ISI" and _key(current_career.nombre) == "ingenieria en sistemas":
+                    profile.career_id = carrera.id
+            enrollment = db.query(Enrollment).filter(
+                Enrollment.student_profile_id == profile.id,
+                Enrollment.commission_id == comision.id,
+            ).first()
+            if not enrollment:
+                db.add(Enrollment(student_profile_id=profile.id, commission_id=comision.id))
+            print(f"Perfil de {user.email}: {carrera.nombre}")
         else:
-            print("No hay ningun usuario con role='student' todavia. Registra uno con /auth/register primero.")
+            print("No hay usuarios estudiantes; catálogo académico cargado igualmente.")
 
         db.commit()
-        print("Datos de ejemplo creados correctamente.")
+        print(f"Catálogo UNRaf disponible: {len(careers)} carreras/tecnicaturas.")
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
