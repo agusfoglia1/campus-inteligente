@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import InstallAppButton from './InstallAppButton'
 
@@ -25,12 +25,34 @@ export { CampusMark }
 export default function AppHeader({ backTo }: Props) {
   const { user, logout } = useAuth()
   const { pathname } = useLocation()
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
+  const accountButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (user?.role !== 'student') return
     document.body.classList.add('has-student-nav')
     return () => document.body.classList.remove('has-student-nav')
   }, [user?.role])
+
+  useEffect(() => {
+    if (!accountOpen) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !accountRef.current?.contains(event.target)) setAccountOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAccountOpen(false)
+        accountButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [accountOpen])
 
   const navLink = (active: boolean) => `rounded-full px-3 py-2 text-sm font-semibold transition ${active ? 'bg-cobalt-soft text-ink' : 'text-ink/60 hover:bg-cobalt-soft hover:text-ink'}`
 
@@ -61,15 +83,33 @@ export default function AppHeader({ backTo }: Props) {
 
         <div className="ml-auto flex items-center gap-2 sm:ml-0 sm:gap-3">
           <InstallAppButton />
-          {user && (
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cobalt-soft text-sm font-bold uppercase text-ink">
-                {user.full_name.slice(0, 1)}
-              </span>
-              <span className="max-w-40 truncate text-sm font-medium text-ink">{user.full_name}</span>
-            </div>
-          )}
-          {user && <button onClick={logout} className="rounded-full border border-ink/15 px-3.5 py-2 text-sm font-semibold text-ink/65 transition hover:border-ink hover:text-ink">Salir</button>}
+          {user && <div className="relative" ref={accountRef}>
+            <button
+              ref={accountButtonRef}
+              type="button"
+              aria-label={`Cuenta de ${user.full_name}`}
+              aria-haspopup="true"
+              aria-expanded={accountOpen}
+              aria-controls="account-menu"
+              onClick={() => setAccountOpen((open) => !open)}
+              className="flex min-h-11 items-center gap-2 rounded-full border border-ink/10 bg-white px-2.5 py-1.5 text-sm font-semibold text-ink transition hover:border-cobalt/40 hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cobalt-strong"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-cobalt-soft text-sm font-bold uppercase text-ink" aria-hidden="true">{user.full_name.slice(0, 1)}</span>
+              <span className="hidden max-w-36 truncate sm:inline">{user.full_name}</span>
+              <span className="sm:hidden">Cuenta</span>
+              <svg aria-hidden="true" viewBox="0 0 20 20" className={`h-4 w-4 text-ink/45 transition-transform ${accountOpen ? 'rotate-180' : ''}`}><path d="m5 7.5 5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            {accountOpen && <div id="account-menu" aria-label="Opciones de cuenta" className="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl border border-ink/10 bg-white p-2 shadow-xl shadow-ink/10">
+              <div className="border-b border-ink/10 px-3 py-3">
+                <p className="truncate text-sm font-bold text-ink">{user.full_name}</p>
+                <p className="mt-0.5 text-xs capitalize text-ink/50">{user.role === 'admin' ? 'Administración' : user.role === 'teacher' ? 'Docencia' : 'Estudiante'}</p>
+              </div>
+              <button type="button" onClick={() => { setAccountOpen(false); logout() }} className="mt-2 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold text-brick transition hover:bg-brick-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brick">
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5"><path d="M8 3.5H4.5v13H8M11.5 6.5l3.5 3.5-3.5 3.5M7 10h8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                Cerrar sesión
+              </button>
+            </div>}
+          </div>}
         </div>
       </div>
     </header>
