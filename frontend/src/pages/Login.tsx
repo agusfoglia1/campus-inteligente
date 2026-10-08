@@ -2,10 +2,12 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { CampusMark } from '../components/AppHeader'
+import { Button } from '../components/ui'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const { login, loading } = useAuth()
   const navigate = useNavigate()
@@ -69,23 +71,26 @@ export default function Login() {
             <div className="flex flex-col gap-2">
               <label htmlFor="email" className="text-sm font-semibold text-ink">Correo electrónico</label>
               <input id="email" type="email" autoComplete="username" required value={email}
-                onChange={(e) => setEmail(e.target.value)} placeholder="nombre@universidad.edu.ar"
+                onChange={(e) => { setEmail(e.target.value); setError('') }} onBlur={(e) => { if (e.target.value && !e.currentTarget.validity.valid) setError('Revisá el formato del correo electrónico.') }} aria-invalid={!!error && !email.includes('@')}
+                placeholder="nombre@universidad.edu.ar"
                 className="rounded-xl border border-ink/15 bg-paper/60 px-4 py-3.5 text-ink outline-none transition placeholder:text-ink/30 focus:border-cobalt focus:bg-white focus:ring-4 focus:ring-cobalt/10" />
             </div>
             <div className="flex flex-col gap-2">
               <label htmlFor="password" className="text-sm font-semibold text-ink">Contraseña</label>
-              <input id="password" type="password" autoComplete="current-password" required value={password}
+              <div className="relative">
+              <input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required minLength={1} value={password}
                 onChange={(e) => setPassword(e.target.value)} placeholder="Ingresá tu contraseña"
-                className="rounded-xl border border-ink/15 bg-paper/60 px-4 py-3.5 text-ink outline-none transition placeholder:text-ink/30 focus:border-cobalt focus:bg-white focus:ring-4 focus:ring-cobalt/10" />
+                className="w-full rounded-xl border border-ink/15 bg-paper/60 px-4 py-3.5 pr-24 text-ink outline-none transition placeholder:text-ink/30 focus:border-cobalt focus:bg-white focus:ring-4 focus:ring-cobalt/10" />
+              <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 min-h-10 -translate-y-1/2 rounded-lg px-3 text-xs font-bold text-ink/60 hover:bg-cobalt-soft" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? 'Ocultar' : 'Mostrar'}</button>
+              </div>
             </div>
           </div>
 
           {error && <p role="alert" className="mt-5 rounded-xl border border-brick/15 bg-brick-soft px-4 py-3 text-sm text-brick">{error}</p>}
-          <button type="submit" disabled={loading}
-            className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-5 py-4 font-semibold text-white shadow-lg shadow-ink/10 transition hover:bg-cobalt focus:outline-none focus:ring-4 focus:ring-cobalt/20 disabled:cursor-wait disabled:opacity-60">
+          <Button type="submit" loading={loading} className="mt-7 w-full rounded-xl bg-ink px-5 py-4 font-semibold text-white shadow-lg shadow-ink/10 hover:bg-cobalt focus:outline-none focus:ring-4 focus:ring-cobalt/20">
             {loading ? 'Ingresando…' : 'Ingresar al campus'}
             {!loading && <span aria-hidden="true">→</span>}
-          </button>
+          </Button>
           <p className="mt-7 text-center text-xs leading-5 text-ink/40">Acceso exclusivo para estudiantes, docentes y personal de la universidad.</p>
         </form>
       </section>

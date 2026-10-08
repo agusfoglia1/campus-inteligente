@@ -1,8 +1,12 @@
+import { DashboardSkeleton, Skeleton } from './ui'
+
 export default function Spinner({ label = 'Cargando...' }: { label?: string }) {
-  return (
-    <div className="flex items-center justify-center gap-2 py-8 text-slate-500">
-      <div className="w-5 h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
-      <span className="text-sm">{label}</span>
+  return label.toLocaleLowerCase('es').includes('dashboard') || label === 'Cargando...' ? <DashboardSkeleton /> : (
+    <div className="grid gap-3 py-4" role="status" aria-label={label}>
+      <Skeleton className="h-8 w-2/5 rounded-xl" />
+      <Skeleton className="h-24 rounded-2xl" />
+      <Skeleton className="h-16 rounded-2xl" />
+      <span className="sr-only">{label}</span>
     </div>
   )
 }

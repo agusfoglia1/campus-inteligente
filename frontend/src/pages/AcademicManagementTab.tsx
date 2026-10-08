@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { api, getErrorMessage } from '../lib/api'
 import ErrorMessage from '../components/ErrorMessage'
 import Spinner from '../components/Spinner'
+import { Button, Drawer, EmptyState, Tabs } from '../components/ui'
+import { useToast } from '../components/toast'
+import { unrafCurricula } from '../data/unrafCurricula'
 
 type Resource = 'buildings' | 'classrooms' | 'careers' | 'subjects' | 'commissions' | 'schedule-slots'
 type Item = { id: string; [key: string]: unknown }
@@ -51,6 +54,11 @@ export default function AcademicManagementTab() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
+  const [query, setQuery] = useState('')
+  const [sortAscending, setSortAscending] = useState(true)
+  const [importingCatalog, setImportingCatalog] = useState(false)
+  const [importProgress, setImportProgress] = useState('')
+  const notify = useToast()
 
   const buildings = data.buildings as Building[]
   const classrooms = data.classrooms as Classroom[]
@@ -58,6 +66,76 @@ export default function AcademicManagementTab() {
   const subjects = data.subjects as Subject[]
   const commissions = data.commissions as Commission[]
   const slots = data['schedule-slots'] as ScheduleSlot[]
+
+  function normalizedName(value: string) {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').replace(/[^a-z0-9]+/g, ' ').trim()
+  }
+
+  async function importOfficialCatalog() {
+    const subjectTotal = unrafCurricula.reduce((total, program) => total + program.subjects.length, 0)
+    if (!window.confirm(`Se agregarán las carreras y materias oficiales que falten en la base académica (hasta ${unrafCurricula.length} carreras y ${subjectTotal} materias). Los registros existentes no se modificarán. ¿Continuar?`)) return
+    setImportingCatalog(true)
+    setImportProgress('Preparando catálogo…')
+    let createdCareers = 0
+    let createdSubjects = 0
+    let skippedSubjects = 0
+    const failures: string[] = []
+    let knownCareers = [...careers]
+    let knownSubjects = [...subjects]
+    try {
+      for (const [programIndex, program] of unrafCurricula.entries()) {
+        setImportProgress(`Carrera ${programIndex + 1} de ${unrafCurricula.length}: ${program.name}`)
+        let career = knownCareers.find((item) => normalizedName(item.nombre) === normalizedName(program.name))
+        if (!career) {
+          const usedCodes = new Set(knownCareers.map((item) => item.codigo.toLocaleUpperCase()))
+          let code = program.code
+          let suffix = 2
+          while (usedCodes.has(code.toLocaleUpperCase())) code = `${program.code}-${suffix++}`
+          try {
+            const response = await api.post<Career>('/academic/careers', { nombre: program.name, codigo: code })
+            career = response.data
+            knownCareers.push(career)
+            createdCareers += 1
+          } catch (err) {
+            failures.push(`${program.name}: ${getErrorMessage(err, 'no se pudo crear la carrera')}`)
+            continue
+          }
+        }
+
+        const missing = program.subjects.flatMap((name, index) => {
+          const exists = knownSubjects.some((item) => item.career_id === career?.id && normalizedName(item.nombre) === normalizedName(name))
+          if (exists) { skippedSubjects += 1; return [] }
+          const baseCode = `${program.code}-M${String(index + 1).padStart(3, '0')}`
+          const usedCodes = new Set(knownSubjects.map((item) => item.codigo.toLocaleUpperCase()))
+          let code = baseCode
+          let suffix = 2
+          while (usedCodes.has(code.toLocaleUpperCase())) code = `${baseCode}-${suffix++}`
+          return [{ nombre: name, codigo: code, career_id: career!.id }]
+        })
+        for (let offset = 0; offset < missing.length; offset += 8) {
+          const batch = missing.slice(offset, offset + 8)
+          const results = await Promise.allSettled(batch.map((body) => api.post<Subject>('/academic/subjects', body)))
+          results.forEach((result, batchIndex) => {
+            if (result.status === 'fulfilled') {
+              knownSubjects.push(result.value.data)
+              createdSubjects += 1
+            } else {
+              failures.push(`${program.name} · ${batch[batchIndex].nombre}: ${getErrorMessage(result.reason, 'no se pudo crear la materia')}`)
+            }
+          })
+        }
+      }
+      await load()
+      notify(`Catálogo cargado: ${createdCareers} carreras y ${createdSubjects} materias nuevas`)
+      setImportProgress(`Listo: ${createdCareers} carreras y ${createdSubjects} materias agregadas; ${skippedSubjects} materias ya existían.${failures.length ? ` ${failures.length} registros necesitan revisión.` : ''}`)
+      if (failures.length) setError(`Algunos registros no se pudieron importar: ${failures.slice(0, 4).join(' · ')}${failures.length > 4 ? ` · y ${failures.length - 4} más` : ''}`)
+    } catch (err) {
+      setImportProgress('')
+      setError(getErrorMessage(err, 'No se pudo completar la importación. Los registros ya creados permanecen guardados.'))
+    } finally {
+      setImportingCatalog(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -181,6 +259,7 @@ export default function AcademicManagementTab() {
       else await api.post(`/academic/${resource}`, body)
       setShowForm(false)
       setEditing(null)
+      notify(editing ? 'Cambios guardados' : 'Registro creado')
       await load()
     } catch (err) {
       setFormError(getErrorMessage(err, 'No se pudo guardar. Revisá que los datos sean válidos y no estén repetidos.'))
@@ -194,6 +273,7 @@ export default function AcademicManagementTab() {
     setError('')
     try {
       await api.delete(`/academic/${resource}/${item.id}`)
+      notify('Registro eliminado')
       await load()
     } catch (err) {
       setError(getErrorMessage(err, 'No se pudo eliminar. Puede estar asociado a otros registros.'))
@@ -212,6 +292,10 @@ export default function AcademicManagementTab() {
     return `${text(subjects.find((row) => row.id === commission?.subject_id)?.nombre)} · ${text(slot.dia)} ${text(slot.hora_inicio).slice(0, 5)}–${text(slot.hora_fin).slice(0, 5)} · Aula ${text(classroom?.codigo)}`
   }
 
+  const visibleItems = data[resource]
+    .filter((item) => labelFor(resource, item).toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')))
+    .sort((a, b) => labelFor(resource, a).localeCompare(labelFor(resource, b), 'es') * (sortAscending ? 1 : -1))
+
   if (loading) return <Spinner />
 
   return (
@@ -221,27 +305,22 @@ export default function AcademicManagementTab() {
         <p className="text-sm text-ink/50 mt-1">Administrá la estructura del campus y sus horarios.</p>
       </div>
 
-      <div className="flex gap-1 bg-white rounded-xl border border-ink/10 p-1 overflow-x-auto">
-        {RESOURCES.map((item) => (
-          <button key={item.id} onClick={() => { setResource(item.id); setShowForm(false); setError('') }}
-            className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${resource === item.id ? 'bg-ink text-paper' : 'text-ink/60 hover:bg-paper'}`}>
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <Tabs items={RESOURCES} value={resource} onChange={(value) => { setResource(value as Resource); setShowForm(false); setError('') }} label="Gestión académica" />
 
       {error && <ErrorMessage message={error} onRetry={load} />}
 
       <div className="flex flex-wrap justify-between items-center gap-2">
         <h3 className="font-display text-lg text-ink">{RESOURCES.find((item) => item.id === resource)?.label}</h3>
-        <button onClick={showForm ? () => setShowForm(false) : openCreate}
-          className="text-sm bg-cobalt text-white px-3 py-2 rounded-lg hover:bg-ink transition-colors">
-          {showForm ? 'Cancelar' : 'Nuevo registro'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {(resource === 'careers' || resource === 'subjects') && <Button variant="secondary" disabled={importingCatalog} onClick={importOfficialCatalog}>{importingCatalog ? 'Cargando catálogo…' : 'Cargar carreras y materias UNRaf'}</Button>}
+          <Button variant={showForm ? 'secondary' : 'primary'} disabled={importingCatalog} onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? 'Cerrar formulario' : 'Nuevo registro'}</Button>
+        </div>
       </div>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="border-l-4 border-cobalt bg-white rounded-r-xl p-5 flex flex-col gap-3">
+      {importProgress && <p role="status" aria-live="polite" className="rounded-xl bg-cobalt-soft px-4 py-3 text-sm text-ink">{importProgress}</p>}
+
+      <Drawer open={showForm} title={editing ? 'Editar registro' : 'Nuevo registro'} onClose={() => setShowForm(false)}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <p className="font-medium text-ink">{editing ? 'Editar registro' : 'Crear registro'}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {fieldsFor(resource).map((field) => (
@@ -264,26 +343,30 @@ export default function AcademicManagementTab() {
             ))}
           </div>
           {formError && <p className="text-brick text-sm">{formError}</p>}
-          <button type="submit" disabled={saving} className="bg-cobalt text-white rounded-lg py-2 text-sm font-medium hover:bg-ink transition-colors disabled:opacity-50">
-            {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear'}
-          </button>
+          <Button type="submit" loading={saving}>{editing ? 'Guardar cambios' : 'Crear registro'}</Button>
         </form>
-      )}
+      </Drawer>
 
-      <div className="bg-white rounded-xl border border-ink/10 p-5">
+      <div className="ui-card">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Buscar ${RESOURCES.find((item) => item.id === resource)?.label.toLocaleLowerCase('es')}…`} aria-label="Buscar registros" className="min-h-11 min-w-0 flex-1 rounded-xl border border-ink/15 bg-paper px-3 text-sm outline-none focus:border-cobalt" />
+          <Button variant="secondary" onClick={() => setSortAscending((value) => !value)} aria-label={`Ordenar ${sortAscending ? 'Z a A' : 'A a Z'}`}>Orden {sortAscending ? 'A–Z' : 'Z–A'}</Button>
+        </div>
         {data[resource].length === 0 ? (
-          <p className="text-ink/40 text-sm">Todavía no hay registros en esta sección.</p>
+          <EmptyState title="Todavía no hay registros" description="Creá el primer registro de esta sección para organizar la información académica." action={<Button className="mt-4" onClick={openCreate}>Crear registro</Button>} />
+        ) : visibleItems.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink/50">No encontramos registros que coincidan con “{query}”.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-ink/5">
-            {data[resource].map((item) => (
-              <li key={item.id} className="py-3 flex flex-wrap justify-between items-center gap-3 text-sm">
+          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visibleItems.map((item) => (
+              <li key={item.id} className="flex flex-col justify-between gap-4 rounded-2xl border border-ink/10 bg-white p-4 text-sm">
                 <div className="min-w-0"><p className="font-medium text-ink">{labelFor(resource, item)}</p>
                   {resource === 'buildings' && <p className="text-ink/45">{text(item.ubicacion)} · {text(item.latitude)}, {text(item.longitude)}</p>}
                   {resource === 'classrooms' && <p className="text-ink/45">Capacidad: {text(item.capacidad)}</p>}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => openEdit(item)} className="rounded-lg border border-ink/15 px-3 py-1.5 text-ink/70 hover:bg-paper">Editar</button>
-                  <button onClick={() => void removeItem(item)} className="rounded-lg border border-brick/20 px-3 py-1.5 text-brick hover:bg-brick/5">Eliminar</button>
+                  <Button variant="secondary" onClick={() => openEdit(item)}>Editar</Button>
+                  <Button variant="danger" onClick={() => void removeItem(item)}>Eliminar</Button>
                 </div>
               </li>
             ))}

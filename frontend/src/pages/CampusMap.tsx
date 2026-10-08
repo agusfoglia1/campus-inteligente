@@ -84,6 +84,14 @@ function locationIcon(tipo: string) {
   })
 }
 
+const buildingIcon = L.divIcon({
+  html: '<div class="campus-building-marker" aria-hidden="true"><span>⌂</span></div>',
+  className: 'campus-marker-shell',
+  iconSize: [42, 48],
+  iconAnchor: [21, 44],
+  popupAnchor: [0, -42],
+})
+
 const userLocationIcon = L.divIcon({
   html: '<div style="width:24px;height:24px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 0 0 8px rgba(37,99,235,.2),0 2px 8px rgba(0,0,0,.35)"></div>',
   className: '',
@@ -121,8 +129,12 @@ export default function CampusMap() {
       setLocationError('')
       return
     }
+    if (!window.isSecureContext) {
+      setLocationError('El navegador bloquea la ubicación porque Campus no está en una conexión segura. Abrilo con HTTPS; localhost solo sirve como excepción en la misma computadora.')
+      return
+    }
     if (!navigator.geolocation) {
-      setLocationError('Este navegador no permite acceder a la ubicación.')
+      setLocationError('Este navegador no permite acceder a la ubicación. Probá con Safari o Chrome actualizado.')
       return
     }
 
@@ -246,12 +258,11 @@ export default function CampusMap() {
             <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Edificio, aula o espacio…"
               className="w-full rounded-xl border border-ink/10 bg-paper px-4 py-3 text-sm outline-none placeholder:text-ink/35 focus:border-cobalt focus:ring-4 focus:ring-cobalt/10" />
           </label>
-          <label><span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-ink/45">Categoría</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full rounded-xl border border-ink/10 bg-paper px-4 py-3 text-sm text-ink outline-none focus:border-cobalt">
-              <option value="todos">Todos los lugares</option><option value="edificios">Edificios y aulas</option>
-              {[...new Set(data.locations.map((location) => location.tipo))].map((type) => <option key={type} value={type}>{type.replace('_', ' ')}</option>)}
-            </select>
-          </label>
+          <div className="sm:col-span-2"><span className="mb-2 block text-xs font-bold uppercase tracking-wide text-ink/45">Filtrar por tipo</span>
+            <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Filtrar lugares del mapa">
+              {[{ id: 'todos', label: 'Todo' }, { id: 'edificios', label: 'Edificios' }, ...[...new Set(data.locations.map((location) => location.tipo))].map((type) => ({ id: type, label: type.replace('_', ' ') }))].map((item) => <button key={item.id} type="button" aria-pressed={category === item.id} onClick={() => setCategory(item.id)} className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold capitalize transition ${category === item.id ? 'border-ink bg-ink text-white' : 'border-ink/10 bg-white text-ink/65 hover:border-cobalt hover:bg-cobalt-soft'}`}>{item.label}</button>)}
+            </div>
+          </div>
         </section>}
 
         {!loading && !error && data && <section className="rounded-3xl border border-ink/10 bg-white p-4 shadow-sm sm:p-5">
@@ -320,7 +331,7 @@ export default function CampusMap() {
                 </Marker>}
 
                 {visibleBuildings.filter((building) => building.latitude !== null && building.longitude !== null).map((b) => (
-                  <Marker key={b.id} position={[b.latitude as number, b.longitude as number]}>
+                  <Marker key={b.id} position={[b.latitude as number, b.longitude as number]} icon={buildingIcon}>
                     <Popup>
                       <strong>{b.nombre}</strong>
                       {b.classrooms.length > 0 && <p className="mt-1 text-sm">Aulas: {b.classrooms.map((c) => c.codigo).join(', ')}</p>}

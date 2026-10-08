@@ -4,6 +4,7 @@ import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import Badge, { toneForEstado } from '../components/Badge'
 import { Link } from 'react-router-dom'
+import { EmptyState, Stat } from '../components/ui'
 
 interface ClassInfo {
   commission_id: string
@@ -51,6 +52,12 @@ export default function StudentDashboard() {
     Notification.permission === 'granted' && localStorage.getItem('class-alerts-enabled') === 'true'
   )
   const [classAlertMessage, setClassAlertMessage] = useState('')
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const load = useCallback(() => {
     setLoading(true)
@@ -119,21 +126,38 @@ export default function StudentDashboard() {
   if (!data) return null
 
   const asistencia = data.porcentaje_asistencia ?? 0
+  const hour = now.getHours()
+  const greeting = hour < 12 ? 'Buen día' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const nextClassMinutes = data.proxima_clase
+    ? Math.max(0, Math.ceil((new Date(`${data.proxima_clase.fecha}T${data.proxima_clase.hora_inicio}`).getTime() - now.getTime()) / 60_000))
+    : null
+  const getLiveState = (classInfo: ClassInfo) => {
+    const [startHour, startMinute] = classInfo.hora_inicio.split(':').map(Number)
+    const [endHour, endMinute] = classInfo.hora_fin.split(':').map(Number)
+    const current = now.getHours() * 60 + now.getMinutes()
+    const start = startHour * 60 + startMinute
+    const end = endHour * 60 + endMinute
+    if (current >= end) return { label: 'Terminada', tone: 'neutral' }
+    if (current >= start) return { label: 'En curso', tone: 'signal' }
+    const minutes = start - current
+    return { label: minutes < 60 ? `Empieza en ${minutes} min` : 'Próxima', tone: 'amber' }
+  }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stagger-in flex flex-col gap-5">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.65fr_.8fr]">
         <section className="relative isolate overflow-hidden rounded-3xl border border-ink/10 bg-white p-5 shadow-sm sm:p-7">
           <div className="campus-dots absolute -right-2 -top-2 h-28 w-28 opacity-50" />
           <div className="relative">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Tu agenda</p>
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">{greeting}, {data.nombre.split(' ')[0]} · Tu agenda</p>
               <span className="rounded-full bg-paper px-3 py-1 text-xs font-semibold text-ink/50">Legajo {data.legajo}</span>
             </div>
             {data.proxima_clase ? (
               <>
                 <p className="text-sm font-medium capitalize text-ink/50">Próxima clase · {data.proxima_clase.dia}</p>
                 <h2 className="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">{data.proxima_clase.materia}</h2>
+                {nextClassMinutes !== null && nextClassMinutes > 0 && <p className="mt-1 text-sm font-bold text-cobalt-strong">Empieza en {nextClassMinutes} min</p>}
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:max-w-lg">
                   <div className="rounded-2xl bg-paper p-3.5">
                     <p className="text-[10px] font-bold uppercase tracking-[.14em] text-ink/40">Horario</p>
@@ -169,9 +193,9 @@ export default function StudentDashboard() {
           <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-white shadow-sm sm:h-28 sm:w-28">
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true">
               <circle cx="50" cy="50" r="43" fill="none" stroke="#dbe9e7" strokeWidth="7" />
-              {data.porcentaje_asistencia !== null && <circle cx="50" cy="50" r="43" fill="none" stroke="#48aeb0" strokeWidth="7" strokeLinecap="round" strokeDasharray={`${Math.min(asistencia, 100) * 2.7} 270`} />}
+              {data.porcentaje_asistencia !== null && <circle cx="50" cy="50" r="43" fill="none" stroke="#48aeb0" strokeWidth="7" strokeLinecap="round" strokeDasharray={`${Math.min(asistencia, 100) * 2.7} 270`} style={{ transition: 'stroke-dasharray 800ms ease' }} />}
             </svg>
-            <span className="font-display text-2xl font-extrabold text-ink">{data.porcentaje_asistencia !== null ? `${asistencia}%` : '—'}</span>
+            <Stat label="Asistencia" value={data.porcentaje_asistencia === null ? null : asistencia} suffix="%" className="absolute inset-0 items-center justify-center bg-transparent p-0 text-center [&>p]:sr-only [&>strong]:text-2xl [&>strong]:text-ink" />
           </div>
           <div>
             <p className="font-display text-lg font-extrabold text-ink">Asistencia</p>
@@ -187,16 +211,18 @@ export default function StudentDashboard() {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-soft text-lg" aria-hidden="true">◷</span>
           </div>
           {data.materias_del_dia.length === 0 ? (
-            <div className="rounded-2xl bg-paper p-4 text-sm text-ink/50">No tenés clases hoy. Disfrutá tu día en el campus.</div>
+            <EmptyState title="Hoy tenés el día libre" description="No hay clases programadas. Disfrutá tu día en el campus." />
           ) : (
             <ul className="divide-y divide-ink/5">
-              {data.materias_del_dia.map((c) => (
-                <li key={c.commission_id} className="flex gap-4 py-4 first:pt-1 last:pb-1">
+              {data.materias_del_dia.map((c) => {
+                const live = getLiveState(c)
+                return <li key={c.commission_id} className="flex gap-4 py-4 first:pt-1 last:pb-1">
                   <div className="w-16 shrink-0 border-r border-ink/10 pr-3 text-sm font-bold tabular-nums text-cobalt">{formatHora(c.hora_inicio)}</div>
                   <div className="min-w-0 flex-1"><p className="truncate font-bold text-ink">{c.materia}</p><p className="mt-1 text-xs text-ink/50">Hasta {formatHora(c.hora_fin)} · Aula {c.aula}</p></div>
+                  <Badge tone={live.tone as 'neutral' | 'signal' | 'amber'}>{live.label}</Badge>
                   <span className="hidden self-center rounded-full bg-paper px-2.5 py-1 text-xs text-ink/50 sm:inline">{c.edificio}</span>
                 </li>
-              ))}
+              })}
             </ul>
           )}
         </section>
@@ -207,7 +233,7 @@ export default function StudentDashboard() {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cobalt-soft text-lg" aria-hidden="true">↗</span>
           </div>
           {data.historial_reciente.length === 0 ? (
-            <div className="rounded-2xl bg-paper p-4 text-sm text-ink/50">Todavía no tenés asistencias registradas.</div>
+            <EmptyState title="Tu historial empieza acá" description="Cuando se registre tu primera asistencia, vas a verla en esta sección." />
           ) : (
             <ul className="divide-y divide-ink/5">
               {data.historial_reciente.slice(0, 5).map((h, i) => (

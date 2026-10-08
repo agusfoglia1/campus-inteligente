@@ -4,6 +4,7 @@ import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import Badge from '../components/Badge'
+import { EmptyState } from '../components/ui'
 
 interface ScheduleInfo {
   dia: string
@@ -51,9 +52,7 @@ export default function TeacherDashboard() {
   if (commissions.length === 0) {
     return (
       <div className="rounded-3xl border border-ink/10 bg-white p-9 text-center shadow-sm">
-        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cobalt-soft font-display text-xl font-extrabold text-cobalt">AC</span>
-        <p className="mt-4 font-display text-xl font-extrabold text-ink">Tus comisiones aparecerán acá</p>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink/50">Cuando tengas comisiones asignadas, vas a poder consultar horarios, estudiantes y asistencia desde este espacio.</p>
+        <EmptyState title="Tus comisiones aparecerán acá" description="Cuando tengas comisiones asignadas, vas a poder consultar horarios, estudiantes y asistencia desde este espacio." />
       </div>
     )
   }

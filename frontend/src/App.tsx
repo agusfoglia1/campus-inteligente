@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import QrScreen from './pages/QrScreen'
@@ -6,11 +7,16 @@ import MyClasses from './pages/MyClasses'
 import TeacherCommissionDetail from './pages/TeacherCommissionDetail'
 import CampusMap from './pages/CampusMap'
 import StudentProfile from './pages/StudentProfile'
+import Spinner from './components/Spinner'
+
+const AcademicCatalog = lazy(() => import('./pages/AcademicCatalog'))
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
+  const location = useLocation()
   return (
-    <Routes>
+    <div key={location.pathname} className="route-enter">
+    <Routes location={location}>
       <Route path="/login" element={<Login />} />
       <Route
         path="/dashboard"
@@ -53,8 +59,19 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/oferta-academica"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<Spinner label="Cargando oferta académica…" />}>
+              <AcademicCatalog />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </div>
   )
 }
 

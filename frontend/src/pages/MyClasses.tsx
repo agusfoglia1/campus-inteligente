@@ -5,6 +5,8 @@ import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import AppHeader from '../components/AppHeader'
 import { downloadCsv, downloadIcs } from '../lib/exportCsv'
+import { EmptyState } from '../components/ui'
+import { useToast } from '../components/toast'
 
 interface ClassInfo {
   commission_id: string
@@ -41,6 +43,7 @@ export default function MyClasses() {
   const [actionError, setActionError] = useState('')
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const notify = useToast()
 
   const load = useCallback(() => {
     setLoading(true)
@@ -62,6 +65,7 @@ export default function MyClasses() {
           item.commission_id === commissionId ? { ...item, estado: 'pendiente_aprobacion' } : item
         )
       )
+      notify('Solicitud enviada para revisión')
     } catch (err) {
       setActionError(getErrorMessage(err, 'No se pudo marcar la materia como aprobada.'))
     } finally {
@@ -128,11 +132,7 @@ export default function MyClasses() {
         {actionError && <ErrorMessage message={actionError} />}
 
         {!loading && !error && classes.length === 0 && (
-          <div className="rounded-3xl border border-ink/10 bg-white p-9 text-center shadow-sm">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cobalt-soft font-display text-xl font-extrabold text-cobalt">01</span>
-            <p className="mt-4 font-display text-xl font-extrabold text-ink">Tu agenda empieza acá</p>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink/50">Todavía no estás inscripta en ninguna materia. Cuando tengas comisiones asignadas, aparecerán en esta sección.</p>
-          </div>
+          <div className="ui-card"><EmptyState title="Tu agenda empieza acá" description="Todavía no tenés materias asignadas. Cuando tengas comisiones, aparecerán en esta sección." action={<Link to="/dashboard" className="ui-button mt-4 bg-ink text-white hover:bg-cobalt">Volver al inicio</Link>} /></div>
         )}
 
         {filteredClasses.length === 0 && classes.length > 0 && (

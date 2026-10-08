@@ -5,6 +5,8 @@ import ErrorMessage from '../components/ErrorMessage'
 import Badge, { toneForEstado } from '../components/Badge'
 import AcademicManagementTab from './AcademicManagementTab'
 import { downloadCsv } from '../lib/exportCsv'
+import { Button, Drawer, EmptyState, Stat, Tabs } from '../components/ui'
+import { useToast } from '../components/toast'
 
 // ---------- Tipos ----------
 interface Stats {
@@ -81,19 +83,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-1 bg-white rounded-xl border border-ink/10 p-1 overflow-x-auto">
-        {TABS.map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex-1 min-w-fit px-3 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
-              tab === key ? 'bg-ink text-white shadow-sm' : 'text-ink/60 hover:bg-cobalt-soft hover:text-ink'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs items={TABS.map(([id, label]) => ({ id, label }))} value={tab} onChange={(value) => setTab(value as Tab)} label="Secciones de administración" />
 
       {tab === 'resumen' && <ResumenTab />}
       {tab === 'estudiantes' && <EstudiantesTab />}
@@ -124,6 +114,7 @@ function ComunicadosTab() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const notify = useToast()
 
   const load = useCallback(() => {
     setError('')
@@ -138,14 +129,14 @@ function ComunicadosTab() {
     setBusy(true); setError(''); setMessage('')
     try {
       await api.post('/announcements/admin', { titulo, contenido, publicado: publicar })
-      setTitulo(''); setContenido(''); setMessage('Comunicado guardado.'); load()
+      setTitulo(''); setContenido(''); setMessage('Comunicado guardado.'); notify('Comunicado guardado'); load()
     } catch (err) { setError(getErrorMessage(err, 'No se pudo guardar el comunicado.')) }
     finally { setBusy(false) }
   }
 
   async function toggle(item: AnnouncementAdmin) {
     setBusy(true); setError(''); setMessage('')
-    try { await api.put(`/announcements/admin/${item.id}`, { publicado: !item.publicado }); load() }
+    try { await api.put(`/announcements/admin/${item.id}`, { publicado: !item.publicado }); notify(item.publicado ? 'Comunicado despublicado' : 'Comunicado publicado'); load() }
     catch (err) { setError(getErrorMessage(err, 'No se pudo cambiar la publicación.')) }
     finally { setBusy(false) }
   }
@@ -159,7 +150,7 @@ function ComunicadosTab() {
       <label className="text-sm font-bold text-ink">Mensaje<textarea required minLength={10} maxLength={5000} rows={4} value={contenido} onChange={e=>setContenido(e.target.value)} className="mt-1.5 w-full resize-y rounded-xl border border-ink/15 bg-paper px-3 py-2.5 font-normal outline-none focus:border-cobalt" placeholder="Escribí la información para estudiantes y docentes…" /></label>
       <div className="flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm text-ink/65"><input type="checkbox" checked={publicar} onChange={e=>setPublicar(e.target.checked)} className="accent-cobalt" />Publicar inmediatamente</label><button disabled={busy} className="rounded-full bg-cobalt px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy?'Guardando…':'Guardar comunicado'}</button></div>
     </form>
-    <div className="flex flex-col gap-3">{items.length===0?<p className="rounded-2xl bg-white p-5 text-sm text-ink/50">Todavía no hay comunicados.</p>:items.map(item=><article key={item.id} className="rounded-2xl border border-ink/10 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display font-bold text-ink">{item.titulo}</h3><p className="mt-1 text-xs text-ink/40">{new Date(item.created_at).toLocaleDateString('es-AR')} · {item.autor_nombre??'Administración'}</p></div><button disabled={busy} onClick={()=>toggle(item)} className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-bold text-ink/65 disabled:opacity-50">{item.publicado?'Despublicar':'Publicar'}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink/65">{item.contenido}</p></article>)}</div>
+    <div className="flex flex-col gap-3">{items.length===0?<EmptyState title="Todavía no hay comunicados" description="Publicá novedades para que estudiantes y docentes las vean en sus paneles." />:items.map(item=><article key={item.id} className="ui-card"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-display font-bold text-ink">{item.titulo}</h3><p className="mt-1 text-xs text-ink/50">{new Date(item.created_at).toLocaleDateString('es-AR')} · {item.autor_nombre??'Administración'}</p></div><button disabled={busy} onClick={()=>toggle(item)} className="rounded-full border border-ink/15 px-3 py-1.5 text-xs font-bold text-ink/65 disabled:opacity-50">{item.publicado?'Despublicar':'Publicar'}</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink/65">{item.contenido}</p></article>)}</div>
   </section>
 }
 
@@ -167,17 +158,18 @@ function AprobacionesTab() {
   const [items, setItems] = useState<{id:string; estudiante:string; legajo:string; materia:string; materia_codigo:string; comision:string}[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const notify = useToast()
   const load = useCallback(() => api.get('/admin/enrollments/pending').then(r => setItems(r.data)).catch(e => setError(getErrorMessage(e, 'No se pudieron cargar las solicitudes.'))), [])
   useEffect(() => { load() }, [load])
   async function review(id: string, estado: 'aprobada' | 'solicitud_rechazada') {
     setBusy(id); setError('')
-    try { await api.put(`/admin/enrollments/${id}/review`, { estado }); await load() }
+    try { await api.put(`/admin/enrollments/${id}/review`, { estado }); notify(estado === 'aprobada' ? 'Estado actualizado: materia aprobada' : 'Solicitud observada'); await load() }
     catch (e) { setError(getErrorMessage(e, 'No se pudo guardar la revisión.')) }
     finally { setBusy(null) }
   }
   return <section className="flex flex-col gap-4"><div><h2 className="font-display text-xl font-extrabold text-ink">Solicitudes de aprobación</h2><p className="mt-1 text-sm text-ink/50">Revisá las materias que los estudiantes informan como aprobadas.</p></div>
     {error && <ErrorMessage message={error} onRetry={load} />}
-    {!error && items.length === 0 && <div className="rounded-2xl border border-ink/10 bg-white p-6 text-sm text-ink/55">No hay solicitudes pendientes.</div>}
+    {!error && items.length === 0 && <EmptyState title="No hay solicitudes pendientes" description="Las solicitudes de aprobación de materias aparecerán acá para su revisión." />}
     <ul className="flex flex-col gap-3">{items.map(i => <li key={i.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink/10 bg-white p-4"><div><p className="font-bold text-ink">{i.materia} <span className="text-xs text-ink/45">{i.materia_codigo}</span></p><p className="mt-1 text-sm text-ink/55">{i.estudiante} · Legajo {i.legajo} · Comisión {i.comision}</p></div><div className="flex gap-2"><button disabled={busy===i.id} onClick={()=>review(i.id,'solicitud_rechazada')} className="rounded-full border border-ink/15 px-3 py-2 text-xs font-bold text-ink/65 disabled:opacity-50">Observar</button><button disabled={busy===i.id} onClick={()=>review(i.id,'aprobada')} className="rounded-full bg-cobalt px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Aprobar</button></div></li>)}</ul>
   </section>
 }
@@ -224,8 +216,7 @@ function ResumenTab() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {cards.map(([label, value], index) => (
           <div key={label} className={`rounded-2xl border border-ink/10 border-t-[3px] bg-white p-4 shadow-sm sm:rounded-3xl sm:p-5 ${index % 3 === 1 ? 'border-t-amber' : 'border-t-cobalt'}`}>
-            <p className="font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">{value}</p>
-            <p className="mt-2 text-xs font-semibold leading-4 text-ink/50 sm:text-sm">{label}</p>
+            <Stat label={label} value={value} className="bg-transparent p-0 [&>strong]:text-3xl sm:[&>strong]:text-4xl" />
           </div>
         ))}
       </div>
@@ -242,6 +233,9 @@ function EstudiantesTab() {
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const notify = useToast()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -285,6 +279,7 @@ function EstudiantesTab() {
       setCareerId('')
       setAnioIngreso('')
       setShowForm(false)
+      notify('Estudiante creado')
       loadStudents()
     } catch (err) {
       setFormError(
@@ -299,18 +294,13 @@ function EstudiantesTab() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap justify-between items-center gap-2">
         <h2 className="font-display text-xl text-ink">Estudiantes</h2>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="text-sm bg-cobalt text-white px-3 py-1.5 rounded-lg hover:bg-ink transition-colors"
-        >
-          {showForm ? 'Cancelar' : 'Nuevo estudiante'}
-        </button>
+        <Button onClick={() => setShowForm((v) => !v)} variant={showForm ? 'secondary' : 'primary'}>{showForm ? 'Cerrar formulario' : 'Nuevo estudiante'}</Button>
       </div>
 
-      {showForm && (
+      <Drawer open={showForm} title="Crear estudiante" onClose={() => setShowForm(false)}>
         <form
           onSubmit={handleSubmit}
-          className="border-l-4 border-cobalt bg-white rounded-r-xl p-5 flex flex-col gap-3"
+          className="flex flex-col gap-4"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
@@ -322,13 +312,14 @@ function EstudiantesTab() {
               className="border border-ink/15 rounded-lg px-3 py-2 text-sm sm:col-span-2 focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="Contraseña"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="border border-ink/15 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cobalt"
             />
+            <button type="button" onClick={() => setShowPassword((value) => !value)} className="min-h-11 rounded-xl border border-ink/10 px-3 text-sm font-semibold text-ink/65 sm:col-span-2">{showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}</button>
             <input
               type="text"
               placeholder="Nombre completo"
@@ -367,27 +358,24 @@ function EstudiantesTab() {
             />
           </div>
           {formError && <p className="text-brick text-sm">{formError}</p>}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="bg-cobalt text-white rounded-lg py-2 text-sm font-medium hover:bg-ink transition-colors disabled:opacity-50"
-          >
-            {submitting ? 'Creando...' : 'Crear estudiante'}
-          </button>
+          <Button type="submit" loading={submitting}>Crear estudiante</Button>
         </form>
-      )}
+      </Drawer>
 
       {loading && <Spinner />}
       {error && <ErrorMessage message={error} onRetry={loadStudents} />}
 
       {!loading && !error && (
         <div className="bg-white rounded-xl border border-ink/10 p-5">
+          <label className="mb-4 block"><span className="sr-only">Buscar estudiante</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nombre, legajo o correo…" className="min-h-11 w-full rounded-xl border border-ink/15 bg-paper px-3 text-sm outline-none focus:border-cobalt" /></label>
           {students.length === 0 ? (
-            <p className="text-ink/40 text-sm">No hay estudiantes cargados.</p>
+            <EmptyState title="Todavía no hay estudiantes" description="Creá un perfil para habilitar el acceso al campus." action={<Button className="mt-4" onClick={() => setShowForm(true)}>Crear estudiante</Button>} />
+          ) : students.filter((student) => `${student.full_name} ${student.legajo} ${student.email}`.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es'))).length === 0 ? (
+            <p className="py-5 text-center text-sm text-ink/50">No encontramos estudiantes con esa búsqueda.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-ink/5">
-              {students.map((s) => (
-                <li key={s.student_profile_id} className="py-2.5 flex justify-between items-center text-sm gap-2">
+            <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {students.filter((student) => `${student.full_name} ${student.legajo} ${student.email}`.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es'))).map((s) => (
+                <li key={s.student_profile_id} className="flex justify-between items-center gap-2 rounded-2xl border border-ink/10 p-4 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium text-ink truncate">{s.full_name}</p>
                     <p className="text-ink/50 truncate">
@@ -412,6 +400,8 @@ function DispositivosTab() {
   const [devices, setDevices] = useState<DeviceAdmin[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<string | null>(null)
+  const notify = useToast()
 
   const loadDevices = useCallback(() => {
     setLoading(true)
@@ -428,8 +418,13 @@ function DispositivosTab() {
   }, [loadDevices])
 
   async function toggleActive(device: DeviceAdmin) {
-    await api.put(`/admin/devices/${device.id}`, { is_active: !device.is_active })
-    loadDevices()
+    setBusy(device.id)
+    try {
+      await api.put(`/admin/devices/${device.id}`, { is_active: !device.is_active })
+      notify(device.is_active ? 'Dispositivo desactivado' : 'Dispositivo activado')
+      loadDevices()
+    } catch (err) { notify(getErrorMessage(err, 'No se pudo actualizar el dispositivo.'), 'error') }
+    finally { setBusy(null) }
   }
 
   if (loading) return <Spinner />
@@ -443,9 +438,9 @@ function DispositivosTab() {
       ) : (
         <ul className="flex flex-col divide-y divide-ink/5">
           {devices.map((d) => (
-            <li key={d.id} className="py-2.5 flex flex-wrap justify-between items-center gap-2 text-sm">
-              <p className="font-medium text-ink">{d.nombre}</p>
-              <button onClick={() => toggleActive(d)}>
+          <li key={d.id} className="py-2.5 flex flex-wrap justify-between items-center gap-2 text-sm">
+            <p className="font-medium text-ink">{d.nombre}</p>
+              <button disabled={busy === d.id} onClick={() => toggleActive(d)} aria-label={`${d.is_active ? 'Desactivar' : 'Activar'} ${d.nombre}`}>
                 <Badge tone={d.is_active ? 'signal' : 'neutral'}>
                   {d.is_active ? 'Activo · desactivar' : 'Inactivo · activar'}
                 </Badge>

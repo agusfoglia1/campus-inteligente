@@ -24,7 +24,7 @@ function CampusIllustration() {
 
 function QuickLink({ to, marker, title, detail }: { to: string; marker: string; title: string; detail: string }) {
   return (
-    <Link to={to} className="group flex min-h-28 items-center gap-4 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm shadow-ink/[.02] transition hover:-translate-y-0.5 hover:border-cobalt/40 hover:shadow-lg hover:shadow-ink/[.06] sm:p-5">
+    <Link to={to} className="group flex min-h-28 items-center gap-4 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm shadow-ink/[.02] transition duration-200 hover:-translate-y-0.5 hover:border-cobalt/40 hover:shadow-lg hover:shadow-ink/[.06] active:scale-[.99] sm:p-5">
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cobalt-soft font-display text-lg font-extrabold text-ink transition group-hover:bg-cobalt group-hover:text-white">{marker}</span>
       <span className="min-w-0 flex-1">
         <span className="block font-display text-base font-extrabold text-ink">{title}</span>
@@ -38,6 +38,8 @@ function QuickLink({ to, marker, title, detail }: { to: string; marker: string; 
 export default function Dashboard() {
   const { user } = useAuth()
   const firstName = user?.full_name.split(' ')[0]
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Buen día' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
   const dateLabel = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
 
   return (
@@ -53,7 +55,7 @@ export default function Dashboard() {
                 <span className="h-2 w-2 rounded-full bg-amber" /> Portal universitario · {dateLabel}
               </p>
               <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
-                {user?.role === 'student' && <>Hola, {firstName}<span className="text-[#8bd2cf]">.</span></>}
+                {user?.role === 'student' && <>{greeting}, {firstName}<span className="text-[#8bd2cf]">.</span></>}
                 {user?.role === 'teacher' && <>Hola, {firstName}<span className="text-[#8bd2cf]">.</span></>}
                 {user?.role === 'admin' && <>Panel administrativo<span className="text-[#8bd2cf]">.</span></>}
               </h1>
@@ -72,6 +74,7 @@ export default function Dashboard() {
           {user?.role === 'student' && <QuickLink to="/qr" marker="QR" title="Mi código de acceso" detail="Mostralo para registrar tu ingreso a clase." />}
           {user?.role === 'student' && <QuickLink to="/materias" marker="01" title="Mis materias" detail="Consultá tus comisiones y horarios." />}
           {user?.role === 'student' && <QuickLink to="/perfil" marker="02" title="Mi perfil académico" detail="Revisá tus datos y avance académico." />}
+          <QuickLink to="/oferta-academica" marker="Aa" title="Carreras y materias" detail="Explorá los planes de estudio publicados por UNRaf." />
           <QuickLink to="/mapa" marker="⌖" title="Mapa del campus" detail="Encontrá edificios y espacios universitarios." />
         </section>
 
