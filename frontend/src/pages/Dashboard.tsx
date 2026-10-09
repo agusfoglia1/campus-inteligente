@@ -5,6 +5,7 @@ import AppHeader from '../components/AppHeader'
 import AnnouncementsPanel from '../components/AnnouncementsPanel'
 import PushNotificationsButton from '../components/PushNotificationsButton'
 import Spinner from '../components/Spinner'
+import CampusIcon, { type CampusIconName } from '../components/CampusIcon'
 
 const StudentDashboard = lazy(() => import('./StudentDashboard'))
 const TeacherDashboard = lazy(() => import('./TeacherDashboard'))
@@ -25,10 +26,10 @@ function CampusIllustration() {
   )
 }
 
-function QuickLink({ to, marker, title, detail }: { to: string; marker: string; title: string; detail: string }) {
+function QuickLink({ to, icon, title, detail }: { to: string; icon: CampusIconName; title: string; detail: string }) {
   return (
     <Link to={to} className="group flex min-h-28 items-center gap-4 rounded-2xl border border-ink/10 bg-white p-4 shadow-sm shadow-ink/[.02] transition duration-200 hover:-translate-y-0.5 hover:border-cobalt/40 hover:shadow-lg hover:shadow-ink/[.06] active:scale-[.99] sm:p-5">
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cobalt-soft font-display text-lg font-extrabold text-ink transition group-hover:bg-cobalt group-hover:text-white">{marker}</span>
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cobalt-soft text-ink transition group-hover:bg-cobalt group-hover:text-white"><CampusIcon name={icon} className="h-6 w-6" /></span>
       <span className="min-w-0 flex-1">
         <span className="block font-display text-base font-extrabold text-ink">{title}</span>
         <span className="mt-1 block text-sm leading-5 text-ink/50">{detail}</span>
@@ -74,10 +75,10 @@ export default function Dashboard() {
         </section>
 
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {user?.role === 'student' && <QuickLink to="/qr" marker="QR" title="Mi código de acceso" detail="Mostralo para registrar tu ingreso a clase." />}
-          {user?.role === 'student' && <QuickLink to="/materias" marker="01" title="Mis materias" detail="Consultá tus comisiones y horarios." />}
-          {user?.role === 'student' && <QuickLink to="/perfil" marker="02" title="Mi perfil académico" detail="Revisá tus datos y avance académico." />}
-          <QuickLink to="/mapa" marker="⌖" title="Mapa del campus" detail="Encontrá edificios y espacios universitarios." />
+          {user?.role === 'student' && <QuickLink to="/qr" icon="qr" title="Mi código de acceso" detail="Mostralo para registrar tu ingreso a clase." />}
+          {user?.role === 'student' && <QuickLink to="/materias" icon="bookOpen" title="Mis materias" detail="Consultá tus comisiones y horarios." />}
+          {user?.role === 'student' && <QuickLink to="/perfil" icon="idCard" title="Mi perfil académico" detail="Revisá tus datos y avance académico." />}
+          <QuickLink to="/mapa" icon="map" title="Mapa del campus" detail="Encontrá edificios y espacios universitarios." />
         </section>
 
         <AnnouncementsPanel />

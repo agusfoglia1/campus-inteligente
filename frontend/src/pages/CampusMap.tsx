@@ -7,6 +7,7 @@ import { api, getErrorMessage } from '../lib/api'
 import Spinner from '../components/Spinner'
 import ErrorMessage from '../components/ErrorMessage'
 import AppHeader from '../components/AppHeader'
+import CampusIcon, { campusIconSvg, type CampusIconName } from '../components/CampusIcon'
 
 function MapFocus({ position }: { position: [number, number] | null }) {
   const map = useMap()
@@ -51,14 +52,14 @@ interface CampusMapData {
   locations: CampusLocation[]
 }
 
-const TIPO_EMOJI: Record<string, string> = {
-  biblioteca: '📚',
-  comedor: '🍽️',
-  sala_estudio: '📖',
-  oficina: '🏢',
-  bano: '🚻',
-  laboratorio: '🔬',
-  otro: '📍',
+const TIPO_ICON: Record<string, CampusIconName> = {
+  biblioteca: 'library',
+  comedor: 'utensils',
+  sala_estudio: 'bookOpen',
+  oficina: 'landmark',
+  bano: 'restroom',
+  laboratorio: 'flask',
+  otro: 'pin',
 }
 
 function normalizeSearch(value: string) {
@@ -66,6 +67,7 @@ function normalizeSearch(value: string) {
 }
 
 function locationIcon(tipo: string) {
+  const icon = campusIconSvg(TIPO_ICON[tipo] ?? 'pin', '#246b72')
   return L.divIcon({
     html: `
       <div style="
@@ -74,9 +76,8 @@ function locationIcon(tipo: string) {
         border: 2px solid #48aeb0;
         border-radius: 9999px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 16px;
         box-shadow: 0 4px 12px rgba(48,56,58,0.22);
-      ">${TIPO_EMOJI[tipo] ?? '📍'}</div>
+      ">${icon}</div>
     `,
     className: '',
     iconSize: [32, 32],
@@ -85,7 +86,7 @@ function locationIcon(tipo: string) {
 }
 
 const buildingIcon = L.divIcon({
-  html: '<div class="campus-building-marker" aria-hidden="true"><span>⌂</span></div>',
+  html: `<div class="campus-building-marker" aria-hidden="true">${campusIconSvg('building', '#ffffff')}</div>`,
   className: 'campus-marker-shell',
   iconSize: [42, 48],
   iconAnchor: [21, 44],
@@ -311,8 +312,9 @@ export default function CampusMap() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 px-5 py-4 sm:px-6">
                 <div><p className="font-display font-extrabold text-ink">Vista general</p><p className="text-xs text-ink/45">Seleccioná un marcador para ver más información.</p></div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={toggleLocation} className={`rounded-full px-4 py-2 text-xs font-bold transition ${trackingLocation ? 'border border-cobalt/20 bg-cobalt-soft text-cobalt' : 'bg-cobalt text-white hover:bg-ink'}`}>
-                    {locationLoading ? 'Buscando ubicación…' : trackingLocation ? 'Dejar de localizarme' : '◎ Usar mi ubicación'}
+                  <button type="button" onClick={toggleLocation} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition ${trackingLocation ? 'border border-cobalt/20 bg-cobalt-soft text-cobalt' : 'bg-cobalt text-white hover:bg-ink'}`}>
+                    {!locationLoading && !trackingLocation && <CampusIcon name="pin" className="h-4 w-4" />}
+                    {locationLoading ? 'Buscando ubicación…' : trackingLocation ? 'Dejar de localizarme' : 'Usar mi ubicación'}
                   </button>
                   <span className="inline-flex items-center gap-2 rounded-full bg-cobalt-soft px-3 py-1.5 text-xs font-bold text-ink/65"><span className="h-2 w-2 rounded-full bg-cobalt" />OpenStreetMap</span>
                 </div>
@@ -342,7 +344,7 @@ export default function CampusMap() {
                 {visibleLocations.map((loc) => (
                   <Marker key={loc.id} position={[loc.latitude, loc.longitude]} icon={locationIcon(loc.tipo)}>
                     <Popup>
-                      <strong>{TIPO_EMOJI[loc.tipo] ?? '📍'} {loc.nombre}</strong>
+                      <strong>{loc.nombre}</strong>
                       {loc.descripcion && <p className="mt-1 text-sm">{loc.descripcion}</p>}
                     </Popup>
                   </Marker>
@@ -356,7 +358,7 @@ export default function CampusMap() {
                 {visibleLocations.length === 0 ? <p className="text-sm text-ink/45">No encontramos espacios con esos filtros.</p> : (
                   <ul className="max-h-[320px] divide-y divide-ink/5 overflow-y-auto">
                     {visibleLocations.map((loc) => <li key={loc.id} className="flex items-start gap-3 py-3 first:pt-1">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-paper text-base">{TIPO_EMOJI[loc.tipo] ?? '📍'}</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-paper text-cobalt"><CampusIcon name={TIPO_ICON[loc.tipo] ?? 'pin'} className="h-5 w-5" /></span>
                       <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-ink">{loc.nombre}</p><p className="mt-0.5 text-xs capitalize text-ink/45">{loc.tipo.replace('_', ' ')}</p><button onClick={() => setFocusPosition([loc.latitude, loc.longitude])} className="mt-1 text-xs font-bold text-cobalt hover:underline">Ver en el mapa</button></div>
                       <a href={directionsUrl([loc.latitude, loc.longitude], userPosition?.coords)} target="_blank" rel="noreferrer" className="shrink-0 self-center text-xs font-bold text-cobalt hover:underline">Cómo llegar ↗</a>
                     </li>)}

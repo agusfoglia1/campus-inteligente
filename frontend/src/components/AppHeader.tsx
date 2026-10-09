@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import InstallAppButton from './InstallAppButton'
+import CampusIcon from './CampusIcon'
 
 interface Props {
   backTo?: { to: string; label: string }
@@ -115,12 +116,12 @@ export default function AppHeader({ backTo }: Props) {
     </header>
       {user?.role === 'student' && <nav className="mobile-bottom-nav sm:hidden" aria-label="Navegación principal">
         {[
-          { to: '/dashboard', label: 'Inicio', icon: '⌂' },
-          { to: '/qr', label: 'Mi QR', icon: '▦', qr: true },
-          { to: '/materias', label: 'Materias', icon: '▤' },
-          { to: '/mapa', label: 'Mapa', icon: '⌖' },
+          { to: '/dashboard', label: 'Inicio', icon: 'home' as const },
+          { to: '/qr', label: 'Mi QR', icon: 'qr' as const, qr: true },
+          { to: '/materias', label: 'Materias', icon: 'bookOpen' as const },
+          { to: '/mapa', label: 'Mapa', icon: 'map' as const },
         ].map((item) => <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={`mobile-bottom-link ${item.qr ? 'mobile-bottom-link-qr' : ''}`}>
-          <span aria-hidden="true">{item.icon}</span><span>{item.label}</span>
+          <CampusIcon name={item.icon} className="h-5 w-5" /><span>{item.label}</span>
         </Link>)}
       </nav>}
     </>

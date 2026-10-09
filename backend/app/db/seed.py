@@ -76,11 +76,18 @@ def run():
             if _key(row.nombre) == _key("Análisis Matemático II")
         )
 
-        edificio = next((row for row in db.query(Building).all() if _key(row.nombre) == _key("Ingeniería")), None)
-        if not edificio:
-            edificio = Building(nombre="Ingeniería", ubicacion="Campus Norte")
-            db.add(edificio)
-            db.flush()
+        buildings = {_key(row.nombre): row for row in db.query(Building).all()}
+        for name, location in (
+            ("E1", "Campus UNRaf"),
+            ("E2", "Campus UNRaf"),
+            ("E4", "Campus UNRaf"),
+        ):
+            if _key(name) not in buildings:
+                building = Building(nombre=name, ubicacion=location)
+                db.add(building)
+                db.flush()
+                buildings[_key(name)] = building
+        edificio = buildings[_key("E1")]
         aula = db.query(Classroom).filter(Classroom.building_id == edificio.id, Classroom.codigo == "A-204").first()
         if not aula:
             aula = Classroom(codigo="A-204", building_id=edificio.id, capacidad=40)

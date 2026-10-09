@@ -54,7 +54,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .campus-marker-shell { background:transparent; border:0; }
 .campus-building-marker { display:grid; width:42px; height:42px; place-items:center; border:3px solid white; border-radius:14px 14px 14px 4px; background:var(--color-ink); color:white; box-shadow:0 4px 14px rgb(20 24 27 / .28); transform:rotate(-45deg); }
-.campus-building-marker span { transform:rotate(45deg); font-size:1.2rem; line-height:1; }
+.campus-building-marker svg { transform:rotate(45deg); }
 
 .ui-button { display:inline-flex; min-height:44px; align-items:center; justify-content:center; gap:.55rem; border-radius:999px; padding:.65rem 1rem; font-size:.875rem; font-weight:700; transition:transform .18s ease, background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease; }
 .ui-button:hover:not(:disabled) { transform:translateY(-1px); }
@@ -113,7 +113,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .mobile-bottom-nav { position:fixed; z-index:1100; right:0; bottom:0; left:0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); padding: .45rem .5rem calc(.45rem + env(safe-area-inset-bottom)); border-top:1px solid rgb(48 56 58 / .1); background:rgb(255 255 255 / .96); backdrop-filter:blur(16px); }
   .mobile-bottom-link { display:flex; min-height:56px; flex-direction:column; align-items:center; justify-content:center; gap:.15rem; border-radius:.9rem; color:rgb(48 56 58 / .58); font-size:.67rem; font-weight:700; }
   .mobile-bottom-link[aria-current="page"] { color:var(--color-cobalt); background:var(--color-cobalt-soft); }
-  .mobile-bottom-link span:first-child { font-size:1.2rem; line-height:1; }
   .mobile-bottom-link-qr { transform:translateY(-.5rem); min-height:3.25rem; width:3.25rem; justify-self:center; border:3px solid white; border-radius:1.1rem; background:var(--color-cobalt); color:white; box-shadow:0 6px 16px rgb(48 56 58 / .2); }
   .mobile-bottom-link-qr[aria-current="page"] { background:var(--color-ink); color:white; }
 }
