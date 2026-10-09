@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../lib/api'
+import { api, getErrorMessage } from '../lib/api'
 
 function decodeBase64Url(value: string): ArrayBuffer {
   const padded = (value + '='.repeat((4 - value.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')
@@ -49,7 +49,7 @@ export default function PushNotificationsButton() {
         return
       }
       const { data } = await api.get<{ public_key: string }>('/push/public-key')
-      if (!data.public_key) throw new Error('Las notificaciones todavía no están configuradas en el servidor.')
+      if (!data.public_key) throw new Error('El servidor no devolvió la clave para activar las notificaciones.')
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: decodeBase64Url(data.public_key),
@@ -58,7 +58,7 @@ export default function PushNotificationsButton() {
       setSubscribed(true)
       setMessage('Listo. Vas a recibir comunicados de la universidad en este dispositivo.')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No se pudo configurar la notificación push.')
+      setMessage(getErrorMessage(error, 'No se pudo configurar la notificación push.'))
     } finally {
       setBusy(false)
     }

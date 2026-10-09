@@ -13,6 +13,11 @@ router = APIRouter(prefix="/push", tags=["push"])
 
 @router.get("/public-key", response_model=PushPublicKey)
 def get_public_key():
+    if not settings.VAPID_PUBLIC_KEY or not settings.VAPID_PRIVATE_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Las notificaciones push todavía no están configuradas en el servidor",
+        )
     return PushPublicKey(public_key=settings.VAPID_PUBLIC_KEY)
 
 
