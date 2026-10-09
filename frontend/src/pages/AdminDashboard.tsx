@@ -142,7 +142,7 @@ function ComunicadosTab() {
   }
 
   return <section className="flex flex-col gap-4">
-    <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Información institucional</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Comunicados</h2><p className="mt-1 text-sm text-ink/50">Publicá avisos visibles en los dashboards del campus.</p></div>
+    <div><p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Información institucional</p><h2 className="mt-1 font-display text-xl font-extrabold text-ink">Comunicados</h2><p className="mt-1 text-sm text-ink/50">Publicá avisos visibles en los paneles del campus.</p></div>
     {error && <ErrorMessage message={error} onRetry={load} />}
     {message && <p role="status" className="rounded-xl bg-signal-soft px-4 py-3 text-sm font-semibold text-signal">{message}</p>}
     <form onSubmit={submit} className="flex flex-col gap-3 rounded-3xl border border-ink/10 bg-white p-5 shadow-sm">

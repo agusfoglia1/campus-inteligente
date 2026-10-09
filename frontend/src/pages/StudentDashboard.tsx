@@ -115,13 +115,13 @@ export default function StudentDashboard() {
       }
       localStorage.setItem('class-alerts-enabled', 'true')
       setClassAlertsEnabled(true)
-      setClassAlertMessage('Listo: recibirás un aviso 15 minutos antes. El dashboard debe permanecer abierto.')
+      setClassAlertMessage('Listo: recibirás un aviso 15 minutos antes. Campus debe permanecer abierto.')
     } catch {
       setClassAlertMessage('No se pudo activar el permiso de notificaciones en este navegador.')
     }
   }
 
-  if (loading) return <Spinner label="Cargando tu dashboard..." />
+  if (loading) return <Spinner label="Cargando tu inicio..." />
   if (error) return <ErrorMessage message={error} onRetry={load} />
   if (!data) return null
 

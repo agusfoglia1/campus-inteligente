@@ -81,7 +81,7 @@ export default function QrScreen() {
 
   return (
     <div className="min-h-screen bg-paper">
-      <AppHeader backTo={{ to: '/dashboard', label: 'Dashboard' }} />
+      <AppHeader backTo={{ to: '/dashboard', label: 'Inicio' }} />
       <main className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-7 pb-28 sm:px-6 sm:py-10 sm:pb-10 lg:grid-cols-[1fr_.8fr] lg:items-center lg:px-8">
         <section className="max-w-xl">
           <p className="text-xs font-bold uppercase tracking-[.16em] text-cobalt">Acceso digital</p>

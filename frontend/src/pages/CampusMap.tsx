@@ -239,7 +239,7 @@ export default function CampusMap() {
 
   return (
     <div className="min-h-screen bg-paper">
-      <AppHeader backTo={{ to: '/dashboard', label: 'Dashboard' }} />
+      <AppHeader backTo={{ to: '/dashboard', label: 'Inicio' }} />
       <main className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:px-8">
         <section className="flex flex-wrap items-end justify-between gap-4">
           <div>
